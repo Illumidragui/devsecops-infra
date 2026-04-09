@@ -30,5 +30,5 @@ variable "ssh_public_key" {
 
 variable "my_ip" {
   description = "Your public IP in CIDR format"
-  type        = string
+  type        = list(string)
 }

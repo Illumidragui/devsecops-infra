@@ -72,7 +72,7 @@ resource "aws_security_group" "k3s" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.my_ip]
+    cidr_blocks = var.my_ip
   }
 
   # Kubernetes API — solo desde tu IP
@@ -81,7 +81,7 @@ resource "aws_security_group" "k3s" {
     from_port   = 6443
     to_port     = 6443
     protocol    = "tcp"
-    cidr_blocks = [var.my_ip]
+    cidr_blocks = var.my_ip
   }
 
   # Todo el tráfico saliente permitido
@@ -147,6 +147,18 @@ resource "aws_instance" "k3s" {
 
   tags = {
     Name        = "${local.name_prefix}-k3s-node"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+
+# Elastic IP — IP estática que sobrevive a destroy/apply
+resource "aws_eip" "k3s" {
+  instance = aws_instance.k3s.id
+  domain   = "vpc"
+
+  tags = {
+    Name        = "${local.name_prefix}-eip"
     Environment = var.environment
     ManagedBy   = "terraform"
   }
