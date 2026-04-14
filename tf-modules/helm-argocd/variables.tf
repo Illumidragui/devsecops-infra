@@ -1,26 +1,36 @@
-# tf-modules/aws/variables.tf
-variable "project_name" {
-  description = "Used to prefix all resource names"
+variable "create" {
+  description = "Whether to deploy ArgoCD and related Helm releases"
+  type        = bool
+  default     = true
+}
+
+variable "kubeconfig_path" {
+  description = "Path to the kubeconfig file for the k3s cluster"
+  type        = string
+  default     = "~/.kube/devsecops-config"
+}
+
+variable "namespace" {
+  description = "Kubernetes namespace where ArgoCD will be deployed"
+  type        = string
+  default     = "argo-cd"
+}
+
+variable "argocd_github_repo" {
+  description = "GitHub repo URL for the App of Apps ArgoCD Application"
   type        = string
 }
 
-variable "environment" {
-  description = "Deployment environment"
-  type        = string
-}
-
-variable "instance_type" {
-  description = "EC2 instance type for the k3s node"
-  type        = string
-}
-
-variable "ssh_public_key" {
-  description = "SSH public key to access the EC2 instance"
+variable "tailscale_oauth_clientid" {
+  description = "Tailscale OAuth client ID for the in-cluster operator (optional)"
   type        = string
   sensitive   = true
+  default     = null
 }
 
-variable "my_ip" {
-  description = "Your public IP in CIDR format (e.g. 1.2.3.4/32)"
-  type        = list(string)
+variable "tailscale_oauth_secret" {
+  description = "Tailscale OAuth client secret for the in-cluster operator (optional)"
+  type        = string
+  sensitive   = true
+  default     = null
 }

@@ -1,0 +1,36 @@
+crds:
+  install: true
+
+namespaceOverride: ${namespace}
+
+server:
+  service:
+    annotations:
+      # Expose ArgoCD UI through the Tailscale operator
+      tailscale.com/expose: "true"
+  extraArgs:
+    - --insecure  # Dev only — remove for staging/prod and configure TLS
+
+configs:
+  secret:
+    # Generate with: htpasswd -nbBC 10 "" <password> | tr -d ':\n' | sed 's/$2y/$2a/'
+    # Default: "password" — change before any non-local deployment
+    argocdServerAdminPassword: "$2a$10$hSCOPmNK41eoRHcfLx3DvOvT04qvzYvnV5XP1qdWpbKW8InDTm.1m"
+
+redis:
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+
+controller:
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+
+repoServer:
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"

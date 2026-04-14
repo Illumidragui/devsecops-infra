@@ -1,0 +1,17 @@
+applications:
+  app-of-apps:
+    additionalAnnotations:
+      "helm.sh/hook": post-install, pre-upgrade
+    namespace: ${namespace}
+    project: default
+    source:
+      repoURL: ${argocd_github_repo}
+      targetRevision: main
+      path: .
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: ${namespace}
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
