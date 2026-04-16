@@ -31,6 +31,24 @@ resource "kubernetes_secret_v1" "tailscale_operator_oauth" {
   }
 }
 
+# ingress-nginx Helm release
+# https://kubernetes.github.io/ingress-nginx
+resource "helm_release" "ingress_nginx" {
+  count = var.create ? 1 : 0
+
+  name             = "ingress-nginx"
+  chart            = "ingress-nginx"
+  repository       = "https://kubernetes.github.io/ingress-nginx"
+  version          = "4.10.1"
+  create_namespace = true
+  namespace        = "ingress-nginx"
+
+  set {
+    name  = "controller.service.type"
+    value = "LoadBalancer"
+  }
+}
+
 # ArgoCD Helm release
 # https://github.com/argoproj/argo-helm/tree/main/charts/argo-cd
 resource "helm_release" "argo-cd" {

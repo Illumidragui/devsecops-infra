@@ -27,7 +27,7 @@ resource "aws_key_pair" "main" {
 resource "aws_security_group" "k3s" {
   count       = var.create ? 1 : 0
   name        = "${local.name_prefix}-k3s-sg"
-  description = "Security group for the k3s node — inbound from VPC only, Tailscale handles external access"
+  description = "Security group for the k3s node - inbound from VPC only, Tailscale handles external access"
   vpc_id      = var.vpc_id
 
   # Allow all traffic within the VPC
@@ -83,8 +83,8 @@ resource "aws_instance" "k3s" {
     tailscale up --authkey=${var.tailscale_authkey} --hostname=${var.tailscale_hostname}
 
     # Install k3s with Tailscale IP as TLS SAN so kubectl works over the VPN
-    TAILSCALE_IP=$(tailscale ip -4)
-    curl -sfL https://get.k3s.io | sh -s - --tls-san "$TAILSCALE_IP"
+    TAILSCALE_IP=$$(tailscale ip -4)
+    curl -sfL https://get.k3s.io | sh -s - --tls-san "$$TAILSCALE_IP" --disable traefik
 
     # Make kubeconfig readable so it can be copied out via SSH
     chmod 644 /etc/rancher/k3s/k3s.yaml
