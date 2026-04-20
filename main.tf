@@ -49,6 +49,7 @@ module "ec2" {
   subnet_id          = module.vpc.private_subnet_id
   vpc_id             = module.vpc.vpc_id
   tailscale_authkey  = var.tailscale_authkey
+  tailscale_hostname = var.tailscale_hostname
 
   depends_on = [module.vpc]
 }

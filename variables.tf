@@ -42,6 +42,12 @@ variable "tailscale_authkey" {
   sensitive   = true
 }
 
+variable "tailscale_hostname" {
+  description = "Hostname for the EC2 node in the Tailscale network"
+  type        = string
+  default     = "k3s-devsecops"
+}
+
 variable "tailscale_oauth_clientid" {
   description = "Tailscale OAuth client ID for the in-cluster operator"
   type        = string
