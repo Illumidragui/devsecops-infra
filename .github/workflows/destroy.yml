@@ -12,12 +12,12 @@ jobs:
     name: Destroy EC2 + ArgoCD (EIP + VPC kept)
     runs-on: ubuntu-latest
     if: github.event.inputs.confirm == 'destroy'
+    permissions:
+      id-token: write
+      contents: read
 
     env:
       AWS_REGION: us-east-1
-      TF_VAR_instance_type: t3.medium
-      TF_VAR_tailscale_hostname: lab-kubernetes
-      TF_VAR_argocd_github_repo: https://github.com/Illumidragui/argocd-app-of-apps
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
       TF_VAR_tailscale_authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
       TF_VAR_tailscale_oauth_clientid: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
@@ -32,8 +32,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform init

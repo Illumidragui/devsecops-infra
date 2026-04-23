@@ -26,7 +26,7 @@ variable "environment" {
 variable "instance_type" {
   description = "EC2 instance type for the k3s node"
   type        = string
-  default     = "t2.micro"
+  default     = "t3.medium"
 }
 
 variable "ssh_public_key" {
@@ -45,7 +45,7 @@ variable "tailscale_authkey" {
 variable "tailscale_hostname" {
   description = "Hostname for the EC2 node in the Tailscale network"
   type        = string
-  default     = "k3s-devsecops"
+  default     = "lab-kubernetes"
 }
 
 variable "tailscale_oauth_clientid" {
@@ -66,7 +66,7 @@ variable "tailscale_oauth_secret" {
 variable "argocd_github_repo" {
   description = "GitHub repo URL for the App of Apps pattern"
   type        = string
-  default     = "https://github.com/Illumidragui/argocd-apps"
+  default     = "https://github.com/Illumidragui/argocd-app-of-apps"
 }
 
 variable "kubeconfig_path" {

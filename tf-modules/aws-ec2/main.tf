@@ -97,7 +97,7 @@ resource "aws_instance" "k3s" {
 
     # Start Tailscale daemon and join the network
     systemctl enable --now tailscaled
-    tailscale up --authkey=${var.tailscale_authkey} --hostname=${var.tailscale_hostname}
+    tailscale up --authkey=${var.tailscale_authkey} --hostname=${var.tailscale_hostname} --advertise-tags=tag:k3s
 
     # Install k3s with Tailscale IP as TLS SAN so kubectl works over the VPN
     TAILSCALE_IP=$(tailscale ip -4)
