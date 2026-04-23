@@ -1,0 +1,90 @@
+name: Destroy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy" to confirm'
+        required: true
+
+jobs:
+  destroy:
+    name: Destroy EC2 + ArgoCD (EIP + VPC kept)
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'destroy'
+
+    env:
+      AWS_REGION: us-east-1
+      TF_VAR_instance_type: t3.medium
+      TF_VAR_tailscale_hostname: lab-kubernetes
+      TF_VAR_argocd_github_repo: https://github.com/Illumidragui/argocd-app-of-apps
+      TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+      TF_VAR_tailscale_authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+      TF_VAR_tailscale_oauth_clientid: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
+      TF_VAR_tailscale_oauth_secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.9"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
+          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
+          tags: tag:ci
+
+      # Try to grab the kubeconfig while the cluster is still alive.
+      # If it fails (cluster already down), the next step handles cleanup via state rm.
+      - name: Fetch kubeconfig
+        id: kubeconfig
+        continue-on-error: true
+        run: |
+          HOSTNAME="lab-kubernetes"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=10 -i ~/.ssh/deploy_key"
+          mkdir -p ~/.kube
+          scp $SSH_OPTS ec2-user@${HOSTNAME}:/etc/rancher/k3s/k3s.yaml ~/.kube/devsecops-config
+          TAILSCALE_IP=$(ssh $SSH_OPTS ec2-user@${HOSTNAME} "tailscale ip -4")
+          sed -i "s/127.0.0.1/${TAILSCALE_IP}/g" ~/.kube/devsecops-config
+
+      # Cluster reachable: tear down Helm releases cleanly before killing the node.
+      - name: Destroy ArgoCD
+        if: steps.kubeconfig.outcome == 'success'
+        env:
+          TF_VAR_kubeconfig_path: /home/runner/.kube/devsecops-config
+        run: terraform destroy -auto-approve -target=module.helm-argocd
+
+      # Cluster already gone: remove Helm release state so next deploy starts clean.
+      - name: Remove ArgoCD from Terraform state
+        if: steps.kubeconfig.outcome != 'success'
+        run: |
+          echo "Cluster unreachable — removing module.helm-argocd from state"
+          terraform state rm module.helm-argocd || true
+
+      - name: Destroy EIP association + EC2
+        run: |
+          terraform destroy -auto-approve \
+            -target=aws_eip_association.k3s \
+            -target=module.ec2
+
+      - name: Confirm EIP is preserved
+        run: |
+          echo "EIP allocation preserved:"
+          terraform output public_ip

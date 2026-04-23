@@ -1,0 +1,91 @@
+name: Deploy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm'
+        required: true
+
+jobs:
+  deploy:
+    name: Two-phase Terraform deploy
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'deploy'
+
+    env:
+      AWS_REGION: us-east-1
+      TF_VAR_instance_type: t3.medium
+      TF_VAR_tailscale_hostname: lab-kubernetes
+      TF_VAR_argocd_github_repo: https://github.com/Illumidragui/argocd-app-of-apps
+      TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+      TF_VAR_tailscale_authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+      TF_VAR_tailscale_oauth_clientid: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
+      TF_VAR_tailscale_oauth_secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.9"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Phase 1 — VPC, EC2, EIP
+        run: |
+          terraform apply -auto-approve \
+            -target=module.vpc \
+            -target=module.ec2 \
+            -target=aws_eip.k3s \
+            -target=aws_eip_association.k3s
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      # Tailscale OAuth credentials must have tag:ci in your ACL policy.
+      - uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
+          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Wait for k3s, then copy kubeconfig
+        run: |
+          HOSTNAME="lab-kubernetes"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=10 -i ~/.ssh/deploy_key"
+
+          echo "Polling until k3s is ready (up to 10 min)..."
+          for i in $(seq 1 40); do
+            if ssh $SSH_OPTS ec2-user@${HOSTNAME} "sudo kubectl get nodes --no-headers 2>/dev/null" | grep -q "Ready"; then
+              echo "k3s ready after attempt $i"
+              break
+            fi
+            [ $i -eq 40 ] && { echo "Timed out waiting for k3s"; exit 1; }
+            echo "Attempt $i/40 — retrying in 15s"
+            sleep 15
+          done
+
+          mkdir -p ~/.kube
+          scp $SSH_OPTS ec2-user@${HOSTNAME}:/etc/rancher/k3s/k3s.yaml ~/.kube/devsecops-config
+          TAILSCALE_IP=$(ssh $SSH_OPTS ec2-user@${HOSTNAME} "tailscale ip -4")
+          sed -i "s/127.0.0.1/${TAILSCALE_IP}/g" ~/.kube/devsecops-config
+          echo "Kubeconfig written to ~/.kube/devsecops-config"
+
+      - name: Phase 2 — ArgoCD
+        env:
+          TF_VAR_kubeconfig_path: /home/runner/.kube/devsecops-config
+        run: terraform apply -auto-approve
+
+      - name: Print public IP
+        run: terraform output public_ip

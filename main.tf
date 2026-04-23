@@ -46,12 +46,30 @@ module "ec2" {
   environment        = local.environment
   instance_type      = local.instance_type
   ssh_public_key     = var.ssh_public_key
-  subnet_id          = module.vpc.private_subnet_id
+  subnet_id          = module.vpc.public_subnet_id
   vpc_id             = module.vpc.vpc_id
   tailscale_authkey  = var.tailscale_authkey
   tailscale_hostname = var.tailscale_hostname
 
   depends_on = [module.vpc]
+}
+
+# EIP lives outside module.ec2 so it survives terraform destroy -target=module.ec2.
+# The association is re-created on each deploy and torn down with the instance.
+resource "aws_eip" "k3s" {
+  domain = "vpc"
+
+  tags = {
+    Name = "${local.project_name}-${local.environment}-eip"
+  }
+}
+
+resource "aws_eip_association" "k3s" {
+  count         = module.ec2.instance_id != null ? 1 : 0
+  instance_id   = module.ec2.instance_id
+  allocation_id = aws_eip.k3s.allocation_id
+
+  depends_on = [module.ec2]
 }
 
 # Deployment of ArgoCD + App of Apps Helm chart.

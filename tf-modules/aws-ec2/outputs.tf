@@ -12,3 +12,4 @@ output "tailscale_hostname" {
   description = "Hostname of the k3s node in the Tailscale network"
   value       = var.tailscale_hostname
 }
+

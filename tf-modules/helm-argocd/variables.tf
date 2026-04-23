@@ -1,7 +1,7 @@
 variable "create" {
   description = "Whether to deploy ArgoCD and related Helm releases"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "kubeconfig_path" {
