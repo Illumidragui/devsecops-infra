@@ -56,11 +56,12 @@ jobs:
         id: kubeconfig
         continue-on-error: true
         run: |
-          HOSTNAME="lab-kubernetes"
+          TS_HOSTNAME="lab-kubernetes"
           SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=10 -i ~/.ssh/deploy_key"
+          TAILSCALE_IP=$(tailscale ip -4 "${TS_HOSTNAME}" 2>/dev/null)
+          [ -z "${TAILSCALE_IP}" ] && { echo "Node not found in Tailnet"; exit 1; }
           mkdir -p ~/.kube
-          scp $SSH_OPTS ec2-user@${HOSTNAME}:/etc/rancher/k3s/k3s.yaml ~/.kube/devsecops-config
-          TAILSCALE_IP=$(ssh $SSH_OPTS ec2-user@${HOSTNAME} "tailscale ip -4")
+          scp $SSH_OPTS ec2-user@${TAILSCALE_IP}:/etc/rancher/k3s/k3s.yaml ~/.kube/devsecops-config
           sed -i "s/127.0.0.1/${TAILSCALE_IP}/g" ~/.kube/devsecops-config
 
       # Cluster reachable: tear down Helm releases cleanly before killing the node.
