@@ -65,7 +65,7 @@ resource "aws_eip" "k3s" {
 }
 
 resource "aws_eip_association" "k3s" {
-  count         = module.ec2.instance_id != null ? 1 : 0
+  count         = 1
   instance_id   = module.ec2.instance_id
   allocation_id = aws_eip.k3s.allocation_id
 
