@@ -88,9 +88,9 @@ resource "aws_instance" "k3s" {
   key_name                    = aws_key_pair.main[0].key_name
   associate_public_ip_address = true
 
-  user_data = base64encode(<<-EOF
+  user_data_base64 = base64encode(<<-EOF
     #!/bin/bash
-    set -e
+    set -euxo pipefail
 
     # Install Tailscale
     curl -fsSL https://tailscale.com/install.sh | sh
