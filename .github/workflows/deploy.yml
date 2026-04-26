@@ -66,7 +66,7 @@ jobs:
 
           echo "Waiting for node to appear in Tailnet (up to 5 min)..."
           for i in $(seq 1 20); do
-            TAILSCALE_IP=$(tailscale ip -4 "${TS_HOSTNAME}" 2>/dev/null)
+            TAILSCALE_IP=$(tailscale ip -4 "${TS_HOSTNAME}" 2>/dev/null) || true
             [ -n "${TAILSCALE_IP}" ] && { echo "Node visible at ${TAILSCALE_IP}"; break; }
             [ $i -eq 20 ] && { echo "Timed out waiting for node in Tailnet"; exit 1; }
             echo "Attempt $i/20 — retrying in 15s"

@@ -58,7 +58,7 @@ jobs:
         run: |
           TS_HOSTNAME="lab-kubernetes"
           SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=10 -i ~/.ssh/deploy_key"
-          TAILSCALE_IP=$(tailscale ip -4 "${TS_HOSTNAME}" 2>/dev/null)
+          TAILSCALE_IP=$(tailscale ip -4 "${TS_HOSTNAME}" 2>/dev/null) || true
           [ -z "${TAILSCALE_IP}" ] && { echo "Node not found in Tailnet"; exit 1; }
           mkdir -p ~/.kube
           scp $SSH_OPTS ec2-user@${TAILSCALE_IP}:/etc/rancher/k3s/k3s.yaml ~/.kube/devsecops-config
