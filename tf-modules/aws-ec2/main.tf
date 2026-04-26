@@ -65,6 +65,15 @@ resource "aws_security_group" "k3s" {
     description = "HTTPS from NLB"
   }
 
+  # Tailscale WireGuard — required for direct peer connections (without this, falls back to slow DERP relay)
+  ingress {
+    from_port   = 41641
+    to_port     = 41641
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Tailscale WireGuard"
+  }
+
   # Allow all outbound — needed for Tailscale, k3s, package downloads
   egress {
     from_port   = 0
