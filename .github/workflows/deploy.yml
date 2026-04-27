@@ -18,6 +18,7 @@ jobs:
 
     env:
       AWS_REGION: us-east-1
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
       TF_VAR_tailscale_authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
       TF_VAR_tailscale_oauth_clientid: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
@@ -32,7 +33,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Set up SSH key
@@ -40,7 +41,6 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keygen -l -f ~/.ssh/deploy_key
 
       # Join Tailnet before Phase 1 so we can verify the hostname slot is free
       # before the new EC2 boots and tries to register as lab-kubernetes.
@@ -91,17 +91,6 @@ jobs:
             [ -n "${TAILSCALE_IP}" ] && { echo "Node visible at ${TAILSCALE_IP}"; break; }
             [ $i -eq 20 ] && { echo "Timed out waiting for node in Tailnet"; exit 1; }
             echo "Attempt $i/20 — retrying in 15s"
-            sleep 15
-          done
-
-          echo "Verifying Tailscale data path (up to 3 min)..."
-          for i in $(seq 1 12); do
-            if tailscale ping -c 3 "${TAILSCALE_IP}" 2>/dev/null | grep -q "pong"; then
-              echo "Tailscale data path confirmed"
-              break
-            fi
-            [ $i -eq 12 ] && { echo "Tailscale data path not established"; tailscale status; exit 1; }
-            echo "Attempt $i/12 — retrying in 15s"
             sleep 15
           done
 
