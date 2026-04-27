@@ -31,6 +31,29 @@ resource "kubernetes_secret_v1" "tailscale_operator_oauth" {
   }
 }
 
+# Tailscale operator Helm release
+# https://tailscale.com/kb/1236/kubernetes-operator
+resource "helm_release" "tailscale_operator" {
+  count = var.create && var.tailscale_oauth_clientid != null && var.tailscale_oauth_secret != null ? 1 : 0
+
+  name             = "tailscale-operator"
+  chart            = "tailscale-operator"
+  repository       = "https://pkgs.tailscale.com/helmcharts"
+  version          = "1.82.0"
+  namespace        = kubernetes_namespace_v1.tailscale[0].metadata[0].name
+
+  set {
+    name  = "oauth.clientId"
+    value = var.tailscale_oauth_clientid
+  }
+  set_sensitive {
+    name  = "oauth.clientSecret"
+    value = var.tailscale_oauth_secret
+  }
+
+  depends_on = [kubernetes_secret_v1.tailscale_operator_oauth]
+}
+
 # ingress-nginx Helm release
 # https://kubernetes.github.io/ingress-nginx
 resource "helm_release" "ingress_nginx" {
@@ -67,6 +90,8 @@ resource "helm_release" "argo-cd" {
       argocd_admin_password_hash = var.argocd_admin_password_hash
     })
   ]
+
+  depends_on = [helm_release.tailscale_operator]
 }
 
 # ArgoCD App of Apps Helm release
