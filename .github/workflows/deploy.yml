@@ -35,6 +35,40 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -l -f ~/.ssh/deploy_key
+
+      # Join Tailnet before Phase 1 so we can verify the hostname slot is free
+      # before the new EC2 boots and tries to register as lab-kubernetes.
+      # OAuth credentials must have tag:ci in your ACL policy.
+      - uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
+          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
+          tags: tag:ci
+
+      # Ephemeral devices are removed from the Tailnet after they disconnect,
+      # but cleanup can take 1-2 min. If we deploy before the old lab-kubernetes
+      # device is gone, the new EC2 gets a suffixed hostname (lab-kubernetes-1,
+      # -2, …) and the workflow resolves the stale dead IP instead of the new one.
+      - name: Wait for lab-kubernetes hostname slot to be free
+        run: |
+          TS_HOSTNAME="lab-kubernetes"
+          echo "Checking for stale '${TS_HOSTNAME}' device in Tailnet..."
+          for i in $(seq 1 12); do
+            if ! tailscale ip -4 "${TS_HOSTNAME}" 2>/dev/null | grep -q .; then
+              echo "Hostname slot is free, proceeding"
+              break
+            fi
+            [ $i -eq 12 ] && { echo "ERROR: stale device still present after 3 min. Delete it from Tailscale admin and retry."; exit 1; }
+            echo "Attempt $i/12 — stale device still visible, waiting 15s for ephemeral cleanup..."
+            sleep 15
+          done
+
       - name: Terraform init
         run: terraform init
 
@@ -45,20 +79,6 @@ jobs:
             -target=module.ec2 \
             -target=aws_eip.k3s \
             -target=aws_eip_association.k3s
-
-      - name: Set up SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keygen -l -f ~/.ssh/deploy_key
-
-      # Tailscale OAuth credentials must have tag:ci in your ACL policy.
-      - uses: tailscale/github-action@v2
-        with:
-          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
-          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
-          tags: tag:ci
 
       - name: Wait for k3s, then copy kubeconfig
         run: |
@@ -76,7 +96,7 @@ jobs:
 
           echo "Verifying Tailscale data path (up to 3 min)..."
           for i in $(seq 1 12); do
-            if tailscale ping --c 3 "${TAILSCALE_IP}" 2>/dev/null | grep -q "pong"; then
+            if tailscale ping -c 3 "${TAILSCALE_IP}" 2>/dev/null | grep -q "pong"; then
               echo "Tailscale data path confirmed"
               break
             fi
