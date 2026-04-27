@@ -99,7 +99,7 @@ resource "aws_instance" "k3s" {
 
   user_data_base64 = base64encode(<<-EOF
     #!/bin/bash
-    set -euxo pipefail
+    set -euo pipefail
 
     # Install Tailscale
     curl -fsSL https://tailscale.com/install.sh | sh
@@ -108,8 +108,14 @@ resource "aws_instance" "k3s" {
     systemctl enable --now tailscaled
     tailscale up --authkey=${var.tailscale_authkey} --hostname=${var.tailscale_hostname} --advertise-tags=tag:k3s
 
+    # Wait for Tailscale to receive its IP (can take a few seconds after `tailscale up`)
+    for i in $(seq 1 12); do
+      TAILSCALE_IP=$(tailscale ip -4 2>/dev/null) && [ -n "$TAILSCALE_IP" ] && break
+      [ $i -eq 12 ] && { echo "Timed out waiting for Tailscale IP"; exit 1; }
+      sleep 5
+    done
+
     # Install k3s with Tailscale IP as TLS SAN so kubectl works over the VPN
-    TAILSCALE_IP=$(tailscale ip -4)
     curl -sfL https://get.k3s.io | sh -s - --tls-san "$TAILSCALE_IP" --disable traefik
 
     # Make kubeconfig readable so it can be copied out via SSH

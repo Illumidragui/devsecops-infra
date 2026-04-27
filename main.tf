@@ -82,5 +82,4 @@ module "helm-argocd" {
   argocd_github_repo       = var.argocd_github_repo
   tailscale_oauth_clientid = var.tailscale_oauth_clientid
   tailscale_oauth_secret   = var.tailscale_oauth_secret
-
 }
