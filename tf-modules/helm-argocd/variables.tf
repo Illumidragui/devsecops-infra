@@ -21,6 +21,12 @@ variable "argocd_github_repo" {
   type        = string
 }
 
+variable "argocd_admin_password_hash" {
+  description = "Bcrypt hash of the ArgoCD admin password (store plaintext in GitHub Actions secret, hash locally)"
+  type        = string
+  sensitive   = true
+}
+
 variable "tailscale_oauth_clientid" {
   description = "Tailscale OAuth client ID for the in-cluster operator (optional)"
   type        = string

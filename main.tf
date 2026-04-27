@@ -76,10 +76,11 @@ resource "aws_eip_association" "k3s" {
 # Set create = false and apply to first provision the VPC + EC2.
 # After EC2 is up, copy kubeconfig (see README), then set create = true.
 module "helm-argocd" {
-  create                   = true
-  source                   = "./tf-modules/helm-argocd"
-  kubeconfig_path          = var.kubeconfig_path
-  argocd_github_repo       = var.argocd_github_repo
-  tailscale_oauth_clientid = var.tailscale_oauth_clientid
-  tailscale_oauth_secret   = var.tailscale_oauth_secret
+  create                     = true
+  source                     = "./tf-modules/helm-argocd"
+  kubeconfig_path            = var.kubeconfig_path
+  argocd_github_repo         = var.argocd_github_repo
+  argocd_admin_password_hash = var.argocd_admin_password_hash
+  tailscale_oauth_clientid   = var.tailscale_oauth_clientid
+  tailscale_oauth_secret     = var.tailscale_oauth_secret
 }

@@ -13,9 +13,7 @@ server:
 
 configs:
   secret:
-    # Generate with: htpasswd -nbBC 10 "" <password> | tr -d ':\n' | sed 's/$2y/$2a/'
-    # Default: "password" — change before any non-local deployment
-    argocdServerAdminPassword: "$2a$10$hSCOPmNK41eoRHcfLx3DvOvT04qvzYvnV5XP1qdWpbKW8InDTm.1m"
+    argocdServerAdminPassword: "${argocd_admin_password_hash}"
 
 redis:
   resources:

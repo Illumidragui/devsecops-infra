@@ -63,7 +63,8 @@ resource "helm_release" "argo-cd" {
 
   values = [
     templatefile("${path.module}/helm-values/argo-cd_values.yaml", {
-      namespace = var.namespace
+      namespace                  = var.namespace
+      argocd_admin_password_hash = var.argocd_admin_password_hash
     })
   ]
 }

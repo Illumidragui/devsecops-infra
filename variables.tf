@@ -63,6 +63,12 @@ variable "tailscale_oauth_secret" {
 }
 
 # === ArgoCD ===
+variable "argocd_admin_password_hash" {
+  description = "Bcrypt hash of the ArgoCD admin password"
+  type        = string
+  sensitive   = true
+}
+
 variable "argocd_github_repo" {
   description = "GitHub repo URL for the App of Apps pattern"
   type        = string

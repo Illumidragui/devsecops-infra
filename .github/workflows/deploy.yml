@@ -23,6 +23,7 @@ jobs:
       TF_VAR_tailscale_authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
       TF_VAR_tailscale_oauth_clientid: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
       TF_VAR_tailscale_oauth_secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
+      TF_VAR_argocd_admin_password_hash: ${{ secrets.ARGOCD_ADMIN_PASSWORD_HASH }}
 
     steps:
       - uses: actions/checkout@v4
