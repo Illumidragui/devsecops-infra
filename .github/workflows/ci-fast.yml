@@ -1,0 +1,29 @@
+name: CI Fast — dev push
+
+# Fast checks on every push to dev: secret scan + Terraform fmt/validate/tflint.
+# Uses -backend=false so no AWS credentials are needed.
+
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+jobs:
+  # language: node is a required field but only gitleaks runs when scans are disabled.
+  gitleaks:
+    uses: Illumidragui/.github/.github/workflows/_reusable.code-security.yml@main
+    with:
+      language: node
+      run-tests: false
+      run-sonarcloud: false
+      run-snyk: false
+    secrets: inherit
+
+  terraform-lint:
+    needs: gitleaks
+    uses: Illumidragui/.github/.github/workflows/_reusable.ci-lint-terraform.yml@main
+    with:
+      run-checkov: false
+    secrets: inherit
