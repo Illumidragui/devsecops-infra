@@ -1,0 +1,32 @@
+name: CI PR — Quality Gate
+
+# Full gate on PRs to main: Terraform quality check + Checkov IaC security scan.
+# Checkov is advisory (soft_fail) — findings go to the Security tab for review.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # Secret scan only — no language-specific scans for Terraform.
+  gitleaks:
+    uses: Illumidragui/.github/.github/workflows/_reusable.code-security.yml@main
+    with:
+      language: node
+      run-tests: false
+      run-sonarcloud: false
+      run-snyk: false
+    secrets: inherit
+
+  # Fmt check + validate + tflint + Checkov IaC scan.
+  terraform-quality:
+    needs: gitleaks
+    uses: Illumidragui/.github/.github/workflows/_reusable.ci-lint-terraform.yml@main
+    with:
+      run-checkov: true
+    secrets: inherit
