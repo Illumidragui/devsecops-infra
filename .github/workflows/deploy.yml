@@ -9,7 +9,7 @@ on:
 
 jobs:
   deploy:
-    name: Two-phase Terraform deploy
+    name: Terraform — VPC + EC2 + EIP
     runs-on: ubuntu-latest
     if: github.event.inputs.confirm == 'deploy'
     permissions:
@@ -21,9 +21,6 @@ jobs:
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
       TF_VAR_tailscale_authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-      TF_VAR_tailscale_oauth_clientid: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
-      TF_VAR_tailscale_oauth_secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
-      TF_VAR_argocd_admin_password_hash: ${{ secrets.ARGOCD_ADMIN_PASSWORD_HASH }}
 
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +42,6 @@ jobs:
 
       # Join Tailnet before Phase 1 so we can verify the hostname slot is free
       # before the new EC2 boots and tries to register as lab-kubernetes.
-      # OAuth credentials must have tag:ci in your ACL policy.
       - uses: tailscale/github-action@v2
         with:
           oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
@@ -53,9 +49,9 @@ jobs:
           tags: tag:ci
 
       # Ephemeral devices are removed from the Tailnet after they disconnect,
-      # but cleanup can take 1-2 min. If we deploy before the old lab-kubernetes
-      # device is gone, the new EC2 gets a suffixed hostname (lab-kubernetes-1,
-      # -2, …) and the workflow resolves the stale dead IP instead of the new one.
+      # but cleanup can take 1–2 min. If we deploy before the old lab-kubernetes
+      # device is gone, the new EC2 gets a suffixed hostname and the workflow
+      # resolves a stale dead IP instead of the new one.
       - name: Wait for lab-kubernetes hostname slot to be free
         run: |
           TS_HOSTNAME="lab-kubernetes"
@@ -66,14 +62,14 @@ jobs:
               break
             fi
             [ $i -eq 12 ] && { echo "ERROR: stale device still present after 3 min. Delete it from Tailscale admin and retry."; exit 1; }
-            echo "Attempt $i/12 — stale device still visible, waiting 15s for ephemeral cleanup..."
+            echo "Attempt $i/12 — stale device still visible, waiting 15s..."
             sleep 15
           done
 
       - name: Terraform init
         run: terraform init
 
-      - name: Phase 1 — VPC, EC2, EIP
+      - name: Terraform apply — VPC, EC2, EIP
         run: |
           terraform apply -auto-approve \
             -target=module.vpc \
@@ -110,11 +106,7 @@ jobs:
           scp $SSH_OPTS ec2-user@${TAILSCALE_IP}:/etc/rancher/k3s/k3s.yaml ~/.kube/devsecops-config
           sed -i "s/127.0.0.1/${TAILSCALE_IP}/g" ~/.kube/devsecops-config
           echo "Kubeconfig written to ~/.kube/devsecops-config"
-
-      - name: Phase 2 — ArgoCD
-        env:
-          TF_VAR_kubeconfig_path: /home/runner/.kube/devsecops-config
-        run: terraform apply -auto-approve
+          echo "Run scripts/bootstrap-argocd.sh locally to complete GitOps setup."
 
       - name: Print public IP
         run: terraform output public_ip

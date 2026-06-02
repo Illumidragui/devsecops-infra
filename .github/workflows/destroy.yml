@@ -9,7 +9,7 @@ on:
 
 jobs:
   destroy:
-    name: Destroy EC2 + ArgoCD (EIP + VPC kept)
+    name: Destroy EC2 (EIP + VPC kept)
     runs-on: ubuntu-latest
     if: github.event.inputs.confirm == 'destroy'
     permissions:
@@ -21,9 +21,6 @@ jobs:
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
       TF_VAR_tailscale_authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-      TF_VAR_tailscale_oauth_clientid: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
-      TF_VAR_tailscale_oauth_secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
-      TF_VAR_argocd_admin_password_hash: ${{ secrets.ARGOCD_ADMIN_PASSWORD_HASH }}
 
     steps:
       - uses: actions/checkout@v4
@@ -51,34 +48,6 @@ jobs:
           oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
           oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
           tags: tag:ci
-
-      # Try to grab the kubeconfig while the cluster is still alive.
-      # If it fails (cluster already down), the next step handles cleanup via state rm.
-      - name: Fetch kubeconfig
-        id: kubeconfig
-        continue-on-error: true
-        run: |
-          TS_HOSTNAME="lab-kubernetes"
-          SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=10 -i ~/.ssh/deploy_key"
-          TAILSCALE_IP=$(tailscale ip -4 "${TS_HOSTNAME}" 2>/dev/null) || true
-          [ -z "${TAILSCALE_IP}" ] && { echo "Node not found in Tailnet"; exit 1; }
-          mkdir -p ~/.kube
-          scp $SSH_OPTS ec2-user@${TAILSCALE_IP}:/etc/rancher/k3s/k3s.yaml ~/.kube/devsecops-config
-          sed -i "s/127.0.0.1/${TAILSCALE_IP}/g" ~/.kube/devsecops-config
-
-      # Cluster reachable: tear down Helm releases cleanly before killing the node.
-      - name: Destroy ArgoCD
-        if: steps.kubeconfig.outcome == 'success'
-        env:
-          TF_VAR_kubeconfig_path: /home/runner/.kube/devsecops-config
-        run: terraform destroy -auto-approve -target=module.helm-argocd
-
-      # Cluster already gone: remove Helm release state so next deploy starts clean.
-      - name: Remove ArgoCD from Terraform state
-        if: steps.kubeconfig.outcome != 'success'
-        run: |
-          echo "Cluster unreachable — removing module.helm-argocd from state"
-          terraform state rm module.helm-argocd || true
 
       - name: Remove EC2 from Tailscale
         continue-on-error: true
