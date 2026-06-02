@@ -12,6 +12,7 @@ jobs:
     name: Destroy EC2 (EIP + VPC kept)
     runs-on: ubuntu-latest
     if: github.event.inputs.confirm == 'destroy'
+    timeout-minutes: 15
     permissions:
       id-token: write
       contents: read

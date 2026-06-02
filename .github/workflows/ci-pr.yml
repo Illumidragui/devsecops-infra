@@ -1,32 +1,94 @@
 name: CI PR — Quality Gate
 
-# Full gate on PRs to main: Terraform quality check + Checkov IaC security scan.
-# Checkov is advisory (soft_fail) — findings go to the Security tab for review.
+# Full gate on PRs to main: secret scan + Terraform quality + Checkov IaC security.
+# Checkov blocks on HIGH and CRITICAL findings. Suppress known false positives
+# by adding a .checkov.yaml file: run `checkov -d . --create-baseline` locally
+# to generate a baseline of existing findings and commit it as .checkov.baseline.
 
 on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
 
+concurrency:
+  group: ci-pr-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
-  security-events: write
 
 jobs:
-  # Secret scan only — no language-specific scans for Terraform.
   gitleaks:
-    uses: Illumidragui/.github/.github/workflows/_reusable.code-security.yml@main
-    with:
-      language: node
-      run-tests: false
-      run-sonarcloud: false
-      run-snyk: false
-    secrets: inherit
+    name: Gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Fmt check + validate + tflint + Checkov IaC scan.
-  terraform-quality:
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: always
+
+  terraform-lint:
+    name: Terraform Fmt, Validate & tflint
+    runs-on: ubuntu-latest
     needs: gitleaks
-    uses: Illumidragui/.github/.github/workflows/_reusable.ci-lint-terraform.yml@main
-    with:
-      run-checkov: true
-    secrets: inherit
+    timeout-minutes: 10
+    env:
+      TF_PLUGIN_CACHE_DIR: ${{ runner.tool_cache }}/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Create plugin cache dir
+        run: mkdir -p "$TF_PLUGIN_CACHE_DIR"
+      - name: Format check
+        run: terraform fmt -check -recursive
+      - name: Init (no backend)
+        run: terraform init -backend=false
+      - name: Validate
+        run: terraform validate
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+      - name: tflint init
+        run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: tflint
+        run: tflint --recursive
+
+  checkov:
+    name: Checkov IaC Security
+    runs-on: ubuntu-latest
+    needs: terraform-lint
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bridgecrewio/checkov-action@v12
+        with:
+          framework: terraform
+          output_format: sarif
+          output_file_path: checkov-report.sarif
+          soft_fail: false
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov-report.sarif
