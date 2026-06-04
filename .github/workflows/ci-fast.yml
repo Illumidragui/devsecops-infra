@@ -1,9 +1,5 @@
 name: CI Fast — dev push
 
-# Secret scan + Terraform fmt/validate/tflint on every push to dev.
-# Uses -backend=false so no AWS credentials are needed.
-# Paths filter: skips the job when only README or docs change.
-
 on:
   push:
     branches: [dev]
@@ -37,13 +33,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: gitleaks
     timeout-minutes: 10
-    env:
-      TF_PLUGIN_CACHE_DIR: ${{ runner.tool_cache }}/terraform
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
-      - name: Create plugin cache dir
-        run: mkdir -p "$TF_PLUGIN_CACHE_DIR"
       - name: Format check
         run: terraform fmt -check -recursive
       - name: Init (no backend)
