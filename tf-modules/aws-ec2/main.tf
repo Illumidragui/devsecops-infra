@@ -123,6 +123,10 @@ resource "aws_instance" "k3s" {
   EOF
   )
 
+  metadata_options {
+    http_tokens = "required"
+  }
+
   root_block_device {
     volume_size = 30
     encrypted   = true
