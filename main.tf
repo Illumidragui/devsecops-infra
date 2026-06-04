@@ -4,14 +4,6 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
-    helm = {
-      source  = "hashicorp/helm"
-      version = "~> 2.0"
-    }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.0"
-    }
   }
   required_version = ">= 1.0"
 }
@@ -21,10 +13,10 @@ provider "aws" {
 }
 
 locals {
-  aws_region     = var.aws_region
-  project_name   = var.project_name
-  environment    = var.environment
-  instance_type  = var.instance_type
+  aws_region    = var.aws_region
+  project_name  = var.project_name
+  environment   = var.environment
+  instance_type = var.instance_type
 }
 
 # Creation of VPC, subnets, NAT Gateway, and route tables
@@ -72,15 +64,3 @@ resource "aws_eip_association" "k3s" {
   depends_on = [module.ec2]
 }
 
-# Deployment of ArgoCD + App of Apps Helm chart.
-# Set create = false and apply to first provision the VPC + EC2.
-# After EC2 is up, copy kubeconfig (see README), then set create = true.
-module "helm-argocd" {
-  create                     = true
-  source                     = "./tf-modules/helm-argocd"
-  kubeconfig_path            = var.kubeconfig_path
-  argocd_github_repo         = var.argocd_github_repo
-  argocd_admin_password_hash = var.argocd_admin_password_hash
-  tailscale_oauth_clientid   = var.tailscale_oauth_clientid
-  tailscale_oauth_secret     = var.tailscale_oauth_secret
-}

@@ -48,35 +48,3 @@ variable "tailscale_hostname" {
   default     = "lab-kubernetes"
 }
 
-variable "tailscale_oauth_clientid" {
-  description = "Tailscale OAuth client ID for the in-cluster operator"
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-variable "tailscale_oauth_secret" {
-  description = "Tailscale OAuth client secret for the in-cluster operator"
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-# === ArgoCD ===
-variable "argocd_admin_password_hash" {
-  description = "Bcrypt hash of the ArgoCD admin password"
-  type        = string
-  sensitive   = true
-}
-
-variable "argocd_github_repo" {
-  description = "GitHub repo URL for the App of Apps pattern"
-  type        = string
-  default     = "https://github.com/Illumidragui/argocd-app-of-apps"
-}
-
-variable "kubeconfig_path" {
-  description = "Path to the kubeconfig file for the k3s cluster"
-  type        = string
-  default     = "~/.kube/devsecops-config"
-}
