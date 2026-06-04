@@ -22,7 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INFRA_DIR="$(dirname "$SCRIPT_DIR")"
 KUBECONFIG_PATH="${KUBECONFIG_PATH:-$HOME/.kube/devsecops-config}"
 TS_HOSTNAME="${TS_HOSTNAME:-lab-kubernetes}"
-SSH_KEY="${SSH_KEY:-$HOME/.ssh/deploy_key}"
+SSH_KEY="${SSH_KEY:-$HOME/.ssh/devsecops_deploy}"
 SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=30 -i ${SSH_KEY}"
 
 # ── Pre-flight checks ─────────────────────────────────────────────────────────

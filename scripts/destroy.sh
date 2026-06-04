@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# destroy.sh — Destroy EC2 + EIP association. VPC and EIP allocation are kept.
-# EIP is preserved so the DNS record (shengjunye.me → EIP) stays stable.
+# destroy.sh — Destroy EC2 + VPC + EIP association + EIP allocation.
+# WARNING: destroying the EIP invalidates the DNS record for shengjunye.me.
+# After reprovisioning, update the DNS A record with the new EIP.
 #
 # Prerequisites:
 #   aws CLI configured
@@ -58,11 +59,11 @@ cd "$INFRA_DIR"
 info "Initialising Terraform..."
 terraform init -input=false
 
-info "Destroying EIP association + EC2..."
+info "Destroying EIP association + EC2 + VPC + EIP..."
 terraform destroy -auto-approve -input=false \
   -target=aws_eip_association.k3s \
-  -target=module.ec2
+  -target=module.ec2 \
+  -target=module.vpc \
+  -target=aws_eip.k3s
 
-EIP=$(terraform output -raw public_ip 2>/dev/null || echo "(could not read)")
-info "EC2 destroyed. EIP allocation preserved: ${EIP}"
-info "DNS record for shengjunye.me is still valid."
+warn "EIP released. Update the DNS A record for shengjunye.me after next deploy."
