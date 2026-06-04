@@ -35,13 +35,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: gitleaks
     timeout-minutes: 10
-    env:
-      TF_PLUGIN_CACHE_DIR: ${{ runner.tool_cache }}/terraform
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
-      - name: Create plugin cache dir
-        run: mkdir -p "$TF_PLUGIN_CACHE_DIR"
       - name: Format check
         run: terraform fmt -check -recursive
       - name: Init (no backend)
