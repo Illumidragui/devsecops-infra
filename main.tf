@@ -21,7 +21,6 @@ locals {
 
 # Creation of VPC, subnets, NAT Gateway, and route tables
 module "vpc" {
-  create       = true
   source       = "./tf-modules/aws-vpc"
   project_name = local.project_name
   environment  = local.environment
@@ -29,10 +28,7 @@ module "vpc" {
 }
 
 # Creation of EC2 k3s node. Depends on VPC.
-# Set create = false and apply to first provision the VPC.
-# After that, set create = true to deploy the EC2 instance.
 module "ec2" {
-  create             = true
   source             = "./tf-modules/aws-ec2"
   project_name       = local.project_name
   environment        = local.environment

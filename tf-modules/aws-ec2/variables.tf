@@ -1,9 +1,3 @@
-variable "create" {
-  description = "Whether to create the EC2 instance and related resources"
-  type        = bool
-  default     = true
-}
-
 variable "project_name" {
   type = string
 }
@@ -15,7 +9,7 @@ variable "environment" {
 variable "instance_type" {
   description = "EC2 instance type for the k3s node"
   type        = string
-  default     = "t2.micro"
+  default     = "t3.medium"
 }
 
 variable "ssh_public_key" {
@@ -43,5 +37,5 @@ variable "tailscale_authkey" {
 variable "tailscale_hostname" {
   description = "Hostname for the EC2 node in the Tailscale network"
   type        = string
-  default     = "k3s-devsecops"
+  default     = "lab-kubernetes"
 }

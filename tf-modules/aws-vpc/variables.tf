@@ -1,9 +1,3 @@
-variable "create" {
-  description = "Whether to create the VPC and networking resources"
-  type        = bool
-  default     = true
-}
-
 variable "project_name" {
   type = string
 }
