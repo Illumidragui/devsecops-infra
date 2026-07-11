@@ -15,7 +15,6 @@ data "aws_ami" "amazon_linux" {
 }
 
 resource "aws_key_pair" "main" {
-  count      = var.create ? 1 : 0
   key_name   = "${local.name_prefix}-key"
   public_key = var.ssh_public_key
 
@@ -25,7 +24,6 @@ resource "aws_key_pair" "main" {
 }
 
 resource "aws_security_group" "k3s" {
-  count       = var.create ? 1 : 0
   name        = "${local.name_prefix}-k3s-sg"
   description = "Security group for the k3s node - inbound from VPC only, Tailscale handles external access"
   vpc_id      = var.vpc_id
@@ -89,12 +87,11 @@ resource "aws_security_group" "k3s" {
 }
 
 resource "aws_instance" "k3s" {
-  count                       = var.create ? 1 : 0
   ami                         = data.aws_ami.amazon_linux.id
   instance_type               = var.instance_type
   subnet_id                   = var.subnet_id
-  vpc_security_group_ids      = [aws_security_group.k3s[0].id]
-  key_name                    = aws_key_pair.main[0].key_name
+  vpc_security_group_ids      = [aws_security_group.k3s.id]
+  key_name                    = aws_key_pair.main.key_name
   associate_public_ip_address = true
 
   user_data_base64 = base64encode(<<-EOF

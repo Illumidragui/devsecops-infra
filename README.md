@@ -45,11 +45,10 @@ Access to the cluster (SSH, kubectl) is only possible through Tailscale. The sec
 ├── backend.tf                     # S3 remote state
 ├── tf-modules/
 │   ├── aws-vpc/                   # VPC, subnets, IGW, NAT Gateway, route tables
-│   ├── aws-ec2/                   # EC2 instance, security group, SSH key pair
-│   └── helm-argocd/               # ArgoCD, ingress-nginx, App of Apps, Tailscale operator
+│   └── aws-ec2/                   # EC2 instance, security group, SSH key pair
 └── .github/workflows/
-    ├── deploy.yml                 # Two-phase deploy (VPC+EC2 → ArgoCD)
-    └── destroy.yml                # Ordered teardown (ArgoCD → EC2, EIP preserved)
+    ├── deploy.yml                 # Terraform apply: VPC + EC2 + EIP
+    └── destroy.yml                # Destroy EC2 + EIP association, EIP allocation preserved
 ```
 
 ## GitHub secrets and variables
@@ -120,9 +119,10 @@ Trigger the **Deploy Infrastructure** workflow from GitHub Actions (`workflow_di
 
 **What happens:**
 1. Runner joins the Tailnet and waits for the `lab-kubernetes` hostname slot to be free (handles rapid destroy → redeploy cycles)
-2. Phase 1: VPC, EC2, and Elastic IP are created. The EC2 user data installs Tailscale and k3s automatically.
+2. VPC, EC2, and Elastic IP are created via `terraform apply -target=module.vpc,module.ec2,aws_eip.k3s,aws_eip_association.k3s`. The EC2 user data installs Tailscale and k3s automatically.
 3. Runner polls until k3s is ready, then copies the kubeconfig over SSH.
-4. Phase 2: ArgoCD, ingress-nginx, and the App of Apps chart are deployed via Helm.
+
+ArgoCD is **not** deployed by this workflow — bootstrap it separately with `scripts/bootstrap-argocd.sh` once the cluster is ready.
 
 The Elastic IP is created outside the EC2 module so it survives destroy/redeploy cycles — your DNS record never changes.
 
@@ -132,9 +132,10 @@ Trigger the **Destroy Infrastructure** workflow and type `destroy` to confirm.
 
 **What happens:**
 1. Removes the EC2 from Tailscale via the API (instant — no waiting for ephemeral cleanup)
-2. If the cluster is reachable: tears down ArgoCD Helm releases cleanly
-3. If the cluster is already gone: removes the Helm state from Terraform so the next deploy starts clean
-4. Destroys the EC2 and EIP association — **the Elastic IP allocation is preserved**
+2. Destroys the EC2 and EIP association via `terraform destroy -target=aws_eip_association.k3s,module.ec2` — **the Elastic IP allocation is preserved**
+
+ArgoCD isn't managed by Terraform, so there's nothing to tear down here — it simply goes away with the EC2
+instance and gets rebootstrapped via `scripts/bootstrap-argocd.sh` on the next deploy.
 
 ## Local development
 

@@ -1,11 +1,11 @@
 output "instance_id" {
   description = "EC2 instance ID"
-  value       = var.create ? aws_instance.k3s[0].id : null
+  value       = aws_instance.k3s.id
 }
 
 output "instance_ip" {
   description = "Private IP of the k3s EC2 instance (access via Tailscale)"
-  value       = var.create ? aws_instance.k3s[0].private_ip : null
+  value       = aws_instance.k3s.private_ip
 }
 
 output "tailscale_hostname" {

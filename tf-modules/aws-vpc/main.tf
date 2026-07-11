@@ -1,5 +1,4 @@
 resource "aws_vpc" "main" {
-  count                = var.create ? 1 : 0
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
   enable_dns_hostnames = true
@@ -10,8 +9,7 @@ resource "aws_vpc" "main" {
 }
 
 resource "aws_internet_gateway" "main" {
-  count  = var.create ? 1 : 0
-  vpc_id = aws_vpc.main[0].id
+  vpc_id = aws_vpc.main.id
 
   tags = {
     Name = "${local.name_prefix}-igw"
@@ -19,8 +17,7 @@ resource "aws_internet_gateway" "main" {
 }
 
 resource "aws_subnet" "public" {
-  count                   = var.create ? 1 : 0
-  vpc_id                  = aws_vpc.main[0].id
+  vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.0.0/24"
   availability_zone       = "${var.aws_region}a"
   map_public_ip_on_launch = true
@@ -31,8 +28,7 @@ resource "aws_subnet" "public" {
 }
 
 resource "aws_subnet" "private" {
-  count             = var.create ? 1 : 0
-  vpc_id            = aws_vpc.main[0].id
+  vpc_id            = aws_vpc.main.id
   cidr_block        = "10.0.1.0/24"
   availability_zone = "${var.aws_region}a"
 
@@ -42,7 +38,6 @@ resource "aws_subnet" "private" {
 }
 
 resource "aws_eip" "nat" {
-  count  = var.create ? 1 : 0
   domain = "vpc"
 
   tags = {
@@ -51,9 +46,8 @@ resource "aws_eip" "nat" {
 }
 
 resource "aws_nat_gateway" "main" {
-  count         = var.create ? 1 : 0
-  allocation_id = aws_eip.nat[0].id
-  subnet_id     = aws_subnet.public[0].id
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public.id
 
   depends_on = [aws_internet_gateway.main]
 
@@ -63,12 +57,11 @@ resource "aws_nat_gateway" "main" {
 }
 
 resource "aws_route_table" "public" {
-  count  = var.create ? 1 : 0
-  vpc_id = aws_vpc.main[0].id
+  vpc_id = aws_vpc.main.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.main[0].id
+    gateway_id = aws_internet_gateway.main.id
   }
 
   tags = {
@@ -77,18 +70,16 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table_association" "public" {
-  count          = var.create ? 1 : 0
-  subnet_id      = aws_subnet.public[0].id
-  route_table_id = aws_route_table.public[0].id
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
 }
 
 resource "aws_route_table" "private" {
-  count  = var.create ? 1 : 0
-  vpc_id = aws_vpc.main[0].id
+  vpc_id = aws_vpc.main.id
 
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main[0].id
+    nat_gateway_id = aws_nat_gateway.main.id
   }
 
   tags = {
@@ -97,7 +88,6 @@ resource "aws_route_table" "private" {
 }
 
 resource "aws_route_table_association" "private" {
-  count          = var.create ? 1 : 0
-  subnet_id      = aws_subnet.private[0].id
-  route_table_id = aws_route_table.private[0].id
+  subnet_id      = aws_subnet.private.id
+  route_table_id = aws_route_table.private.id
 }
