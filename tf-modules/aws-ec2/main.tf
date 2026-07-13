@@ -24,6 +24,8 @@ resource "aws_key_pair" "main" {
 }
 
 resource "aws_security_group" "k3s" {
+  #checkov:skip=CKV_AWS_382:All outbound is required for Tailscale, k3s, and OS package installs on this single-node lab instance.
+  #checkov:skip=CKV_AWS_260:Public website traffic must reach this instance directly; there is no NLB in front of it in this architecture.
   name        = "${local.name_prefix}-k3s-sg"
   description = "Security group for the k3s node - inbound from VPC only, Tailscale handles external access"
   vpc_id      = var.vpc_id
@@ -46,13 +48,15 @@ resource "aws_security_group" "k3s" {
     description = "k3s API server"
   }
 
-  # HTTP/HTTPS from NLB — NLB preserves source IP so SG must allow 0.0.0.0/0
+  # No AWS NLB in this architecture — the EIP on this instance is the direct
+  # ingress path for the website; ingress-nginx handles routing/TLS once
+  # traffic reaches the node.
   ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTP from NLB"
+    description = "HTTP - direct ingress, routed by ingress-nginx"
   }
 
   ingress {
@@ -60,7 +64,7 @@ resource "aws_security_group" "k3s" {
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTPS from NLB"
+    description = "HTTPS - direct ingress, routed by ingress-nginx"
   }
 
   # Tailscale WireGuard — required for direct peer connections (without this, falls back to slow DERP relay)
@@ -86,13 +90,47 @@ resource "aws_security_group" "k3s" {
   }
 }
 
+# Minimal instance profile so the node isn't credential-less. SSM Session
+# Manager also gives a Tailscale-independent break-glass access path — the
+# AL2023 AMI ships with the SSM agent pre-installed and running.
+resource "aws_iam_role" "k3s" {
+  name = "${local.name_prefix}-k3s-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
+  })
+
+  tags = {
+    Name = "${local.name_prefix}-k3s-role"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "ssm" {
+  role       = aws_iam_role.k3s.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "k3s" {
+  name = "${local.name_prefix}-k3s-profile"
+  role = aws_iam_role.k3s.name
+}
+
 resource "aws_instance" "k3s" {
+  #checkov:skip=CKV_AWS_88:No AWS NLB in this architecture; the EIP+public IP on this instance IS the ingress path for the website and Tailscale. Removing it would break public access.
+  #checkov:skip=CKV_AWS_126:Personal lab, FinOps zero-idle-cost goal - detailed monitoring costs ~$2.10/mo/instance with no operational benefit for a single-node dev cluster.
   ami                         = data.aws_ami.amazon_linux.id
   instance_type               = var.instance_type
   subnet_id                   = var.subnet_id
   vpc_security_group_ids      = [aws_security_group.k3s.id]
   key_name                    = aws_key_pair.main.key_name
+  iam_instance_profile        = aws_iam_instance_profile.k3s.name
   associate_public_ip_address = true
+  ebs_optimized               = true
 
   user_data_base64 = base64encode(<<-EOF
     #!/bin/bash
