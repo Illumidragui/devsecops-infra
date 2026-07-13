@@ -23,9 +23,9 @@ resource "aws_key_pair" "main" {
   }
 }
 
-#checkov:skip=CKV_AWS_382:All outbound is required for Tailscale, k3s, and OS package installs on this single-node lab instance.
-#checkov:skip=CKV_AWS_260:Public website traffic must reach this instance directly; there is no NLB in front of it in this architecture.
 resource "aws_security_group" "k3s" {
+  #checkov:skip=CKV_AWS_382:All outbound is required for Tailscale, k3s, and OS package installs on this single-node lab instance.
+  #checkov:skip=CKV_AWS_260:Public website traffic must reach this instance directly; there is no NLB in front of it in this architecture.
   name        = "${local.name_prefix}-k3s-sg"
   description = "Security group for the k3s node - inbound from VPC only, Tailscale handles external access"
   vpc_id      = var.vpc_id
@@ -120,9 +120,9 @@ resource "aws_iam_instance_profile" "k3s" {
   role = aws_iam_role.k3s.name
 }
 
-#checkov:skip=CKV_AWS_88:No AWS NLB in this architecture; the EIP+public IP on this instance IS the ingress path for the website and Tailscale. Removing it would break public access.
-#checkov:skip=CKV_AWS_126:Personal lab, FinOps zero-idle-cost goal — detailed monitoring costs ~$2.10/mo/instance with no operational benefit for a single-node dev cluster.
 resource "aws_instance" "k3s" {
+  #checkov:skip=CKV_AWS_88:No AWS NLB in this architecture; the EIP+public IP on this instance IS the ingress path for the website and Tailscale. Removing it would break public access.
+  #checkov:skip=CKV_AWS_126:Personal lab, FinOps zero-idle-cost goal - detailed monitoring costs ~$2.10/mo/instance with no operational benefit for a single-node dev cluster.
   ami                         = data.aws_ami.amazon_linux.id
   instance_type               = var.instance_type
   subnet_id                   = var.subnet_id
