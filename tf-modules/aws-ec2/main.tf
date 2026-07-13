@@ -56,7 +56,7 @@ resource "aws_security_group" "k3s" {
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTP — direct ingress, routed by ingress-nginx"
+    description = "HTTP - direct ingress, routed by ingress-nginx"
   }
 
   ingress {
@@ -64,7 +64,7 @@ resource "aws_security_group" "k3s" {
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTPS — direct ingress, routed by ingress-nginx"
+    description = "HTTPS - direct ingress, routed by ingress-nginx"
   }
 
   # Tailscale WireGuard — required for direct peer connections (without this, falls back to slow DERP relay)
