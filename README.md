@@ -39,10 +39,10 @@ Access to the cluster (SSH, kubectl) is only possible through Tailscale. The sec
 ## Repository structure
 
 ```
-├── versions.tf                    # required_providers + provider blocks (aws, porkbun)
+├── versions.tf                    # required_providers + provider blocks (aws, cloudflare)
 ├── main.tf                        # Root module — locals + module.vpc / module.ec2 calls
 ├── eip.tf                         # Elastic IP + association (kept outside module.ec2)
-├── dns.tf                         # Porkbun DNS records for shengjunye.me
+├── dns.tf                         # Cloudflare DNS records for shengjunye.me
 ├── variables.tf                   # Input variables
 ├── outputs.tf                     # Public IP, Tailscale hostname
 ├── backend.tf                     # S3 remote state
@@ -66,8 +66,7 @@ Access to the cluster (SSH, kubectl) is only possible through Tailscale. The sec
 | `TAILSCALE_OAUTH_CLIENTID` | OAuth client ID for the Tailscale GitHub Action and in-cluster operator |
 | `TAILSCALE_OAUTH_SECRET` | OAuth client secret (matching above) |
 | `TAILSCALE_API_TOKEN` | API access token (`tskey-api-...`) used to remove the device on destroy |
-| `PORKBUN_API_KEY` | Porkbun API key (porkbun.com/account/api) |
-| `PORKBUN_SECRET_API_KEY` | Porkbun secret API key |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token, scoped to Zone:Read + DNS:Edit on `shengjunye.me` (dash.cloudflare.com/profile/api-tokens) |
 
 ### Variables (`vars.*`)
 
@@ -92,8 +91,7 @@ gh secret set TAILSCALE_AUTHKEY    --repo Illumidragui/devsecops-infra
 gh secret set TAILSCALE_OAUTH_CLIENTID --repo Illumidragui/devsecops-infra
 gh secret set TAILSCALE_OAUTH_SECRET   --repo Illumidragui/devsecops-infra
 gh secret set TAILSCALE_API_TOKEN  --repo Illumidragui/devsecops-infra
-gh secret set PORKBUN_API_KEY      --repo Illumidragui/devsecops-infra
-gh secret set PORKBUN_SECRET_API_KEY --repo Illumidragui/devsecops-infra
+gh secret set CLOUDFLARE_API_TOKEN --repo Illumidragui/devsecops-infra
 gh variable set AWS_ROLE_ARN       --repo Illumidragui/devsecops-infra
 ```
 
@@ -126,7 +124,7 @@ Trigger the **Deploy Infrastructure** workflow from GitHub Actions (`workflow_di
 
 **What happens:**
 1. Runner joins the Tailnet and waits for the `lab-kubernetes` hostname slot to be free (handles rapid destroy → redeploy cycles)
-2. VPC, EC2, Elastic IP, and DNS records are created via `terraform apply -target=module.vpc,module.ec2,aws_eip.k3s,aws_eip_association.k3s,porkbun_dns_record.apex,porkbun_dns_record.www,porkbun_dns_record.hello`. The EC2 user data installs Tailscale and k3s automatically.
+2. VPC, EC2, Elastic IP, and DNS records are created via `terraform apply -target=module.vpc,module.ec2,aws_eip.k3s,aws_eip_association.k3s,cloudflare_dns_record.apex,cloudflare_dns_record.www,cloudflare_dns_record.hello,cloudflare_dns_record.kuberflow`. The EC2 user data installs Tailscale and k3s automatically.
 3. Runner polls until k3s is ready, then copies the kubeconfig over SSH.
 
 ArgoCD is **not** deployed by this workflow — bootstrap it separately with `scripts/bootstrap-argocd.sh` once the cluster is ready.
@@ -152,10 +150,9 @@ instance and gets rebootstrapped via `scripts/bootstrap-argocd.sh` on the next d
 cp terraform.tfvars.example terraform.tfvars   # or create terraform.tfvars manually
 
 # Required variables (no defaults):
-# ssh_public_key         = "ssh-ed25519 AAAA..."
-# tailscale_authkey      = "tskey-auth-..."
-# porkbun_api_key        = "pk1_..."
-# porkbun_secret_api_key = "sk1_..."
+# ssh_public_key       = "ssh-ed25519 AAAA..."
+# tailscale_authkey    = "tskey-auth-..."
+# cloudflare_api_token = "..."
 
 terraform init
 terraform plan

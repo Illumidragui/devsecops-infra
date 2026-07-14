@@ -48,15 +48,9 @@ variable "tailscale_hostname" {
   default     = "lab-kubernetes"
 }
 
-# === Porkbun DNS ===
-variable "porkbun_api_key" {
-  description = "Porkbun API key (https://porkbun.com/account/api)"
-  type        = string
-  sensitive   = true
-}
-
-variable "porkbun_secret_api_key" {
-  description = "Porkbun secret API key"
+# === Cloudflare DNS ===
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token, scoped to Zone:Read + DNS:Edit on the shengjunye.me zone (https://dash.cloudflare.com/profile/api-tokens)"
   type        = string
   sensitive   = true
 }

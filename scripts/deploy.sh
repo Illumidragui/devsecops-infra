@@ -11,8 +11,7 @@
 # Required env vars (or set as TF_VAR_* in your shell):
 #   TF_VAR_ssh_public_key         — contents of your SSH public key
 #   TF_VAR_tailscale_authkey      — Tailscale pre-auth key for the EC2 node
-#   TF_VAR_porkbun_api_key        — Porkbun API key (porkbun.com/account/api)
-#   TF_VAR_porkbun_secret_api_key — Porkbun secret API key
+#   TF_VAR_cloudflare_api_token   — Cloudflare API token (dash.cloudflare.com/profile/api-tokens)
 set -euo pipefail
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -33,10 +32,9 @@ command -v aws       >/dev/null || error "aws CLI not found"
 aws sts get-caller-identity --query Arn --output text >/dev/null 2>&1 \
   || error "No valid AWS credentials. Run 'aws configure' or set env vars."
 
-[[ -n "${TF_VAR_ssh_public_key:-}" ]]         || error "TF_VAR_ssh_public_key is not set"
-[[ -n "${TF_VAR_tailscale_authkey:-}" ]]      || error "TF_VAR_tailscale_authkey is not set"
-[[ -n "${TF_VAR_porkbun_api_key:-}" ]]        || error "TF_VAR_porkbun_api_key is not set"
-[[ -n "${TF_VAR_porkbun_secret_api_key:-}" ]] || error "TF_VAR_porkbun_secret_api_key is not set"
+[[ -n "${TF_VAR_ssh_public_key:-}" ]]       || error "TF_VAR_ssh_public_key is not set"
+[[ -n "${TF_VAR_tailscale_authkey:-}" ]]    || error "TF_VAR_tailscale_authkey is not set"
+[[ -n "${TF_VAR_cloudflare_api_token:-}" ]] || error "TF_VAR_cloudflare_api_token is not set"
 
 USE_TAILSCALE=false
 if command -v tailscale >/dev/null 2>&1; then
@@ -56,10 +54,10 @@ terraform apply -auto-approve -input=false \
   -target=module.ec2 \
   -target=aws_eip.k3s \
   -target=aws_eip_association.k3s \
-  -target=porkbun_dns_record.apex \
-  -target=porkbun_dns_record.www \
-  -target=porkbun_dns_record.hello \
-  -target=porkbun_dns_record.kuberflow
+  -target=cloudflare_dns_record.apex \
+  -target=cloudflare_dns_record.www \
+  -target=cloudflare_dns_record.hello \
+  -target=cloudflare_dns_record.kuberflow
 
 PUBLIC_IP=$(terraform output -raw public_ip)
 info "EC2 provisioned. EIP: ${PUBLIC_IP}"

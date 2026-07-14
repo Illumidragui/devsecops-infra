@@ -22,8 +22,7 @@ jobs:
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
       TF_VAR_tailscale_authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-      TF_VAR_porkbun_api_key: ${{ secrets.PORKBUN_API_KEY }}
-      TF_VAR_porkbun_secret_api_key: ${{ secrets.PORKBUN_SECRET_API_KEY }}
+      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -79,10 +78,10 @@ jobs:
             -target=module.ec2 \
             -target=aws_eip.k3s \
             -target=aws_eip_association.k3s \
-            -target=porkbun_dns_record.apex \
-            -target=porkbun_dns_record.www \
-            -target=porkbun_dns_record.hello \
-            -target=porkbun_dns_record.kuberflow
+            -target=cloudflare_dns_record.apex \
+            -target=cloudflare_dns_record.www \
+            -target=cloudflare_dns_record.hello \
+            -target=cloudflare_dns_record.kuberflow
 
       - name: Wait for k3s, then copy kubeconfig
         run: |
