@@ -54,8 +54,6 @@ terraform apply -auto-approve -input=false \
   -target=module.ec2 \
   -target=aws_eip.k3s \
   -target=aws_eip_association.k3s \
-  -target=cloudflare_dns_record.apex \
-  -target=cloudflare_dns_record.www \
   -target=cloudflare_dns_record.hello \
   -target=cloudflare_dns_record.kuberflow
 
