@@ -81,7 +81,8 @@ jobs:
             -target=aws_eip_association.k3s \
             -target=porkbun_dns_record.apex \
             -target=porkbun_dns_record.www \
-            -target=porkbun_dns_record.hello
+            -target=porkbun_dns_record.hello \
+            -target=porkbun_dns_record.kuberflow
 
       - name: Wait for k3s, then copy kubeconfig
         run: |

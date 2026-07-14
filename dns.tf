@@ -23,3 +23,11 @@ resource "porkbun_dns_record" "hello" {
   content   = aws_eip.k3s.public_ip
   ttl       = 600
 }
+
+resource "porkbun_dns_record" "kuberflow" {
+  domain    = "shengjunye.me"
+  subdomain = "kuberflow"
+  type      = "A"
+  content   = aws_eip.k3s.public_ip
+  ttl       = 600
+}

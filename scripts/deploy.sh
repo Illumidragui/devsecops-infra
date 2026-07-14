@@ -58,7 +58,8 @@ terraform apply -auto-approve -input=false \
   -target=aws_eip_association.k3s \
   -target=porkbun_dns_record.apex \
   -target=porkbun_dns_record.www \
-  -target=porkbun_dns_record.hello
+  -target=porkbun_dns_record.hello \
+  -target=porkbun_dns_record.kuberflow
 
 PUBLIC_IP=$(terraform output -raw public_ip)
 info "EC2 provisioned. EIP: ${PUBLIC_IP}"

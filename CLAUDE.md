@@ -29,7 +29,7 @@ The root module is split by concern, mirroring the convention already used insid
 | `module.ec2` | `tf-modules/aws-ec2/` | EC2 t3.medium, SG, key pair, user_data (k3s + Tailscale) |
 | `aws_eip.k3s` | `eip.tf` | Elastic IP — never destroy this resource |
 | `aws_eip_association.k3s` | `eip.tf` | Binds EIP to EC2 on each deploy, torn down on destroy |
-| `porkbun_dns_record.*` | `dns.tf` | A records (apex, `www`, `hello`) for `shengjunye.me`, pointing at `aws_eip.k3s` — never destroy |
+| `porkbun_dns_record.*` | `dns.tf` | A records (apex, `www`, `hello`, `kuberflow`) for `shengjunye.me`, pointing at `aws_eip.k3s` — never destroy |
 
 ## Variables (required at deploy time)
 
