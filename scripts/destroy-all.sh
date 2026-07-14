@@ -39,7 +39,7 @@ aws sts get-caller-identity --query Arn --output text >/dev/null 2>&1 \
 # script targets cloudflare_dns_record.hello/.kuberflow for real, so an unset
 # TF_VAR_cloudflare_api_token will fail loudly at the destroy step below
 # instead of silently skipping those records.
-export TF_VAR_cloudflare_api_token="${TF_VAR_cloudflare_api_token:-unused}"
+export TF_VAR_cloudflare_api_token="${TF_VAR_cloudflare_api_token:-unused}" # NOSONAR: TF_VAR_ prefix must exact-case-match the Terraform variable name
 
 # ── Remove from Tailscale ─────────────────────────────────────────────────────
 if [[ -n "${TAILSCALE_API_TOKEN:-}" ]]; then

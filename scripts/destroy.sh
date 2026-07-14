@@ -34,7 +34,7 @@ aws sts get-caller-identity --query Arn --output text >/dev/null 2>&1 \
 
 # Not used here (cloudflare_dns_record.* is never targeted) but the provider
 # block in versions.tf requires a value or terraform prompts interactively.
-export TF_VAR_cloudflare_api_token="${TF_VAR_cloudflare_api_token:-unused}"
+export TF_VAR_cloudflare_api_token="${TF_VAR_cloudflare_api_token:-unused}" # NOSONAR: TF_VAR_ prefix must exact-case-match the Terraform variable name
 
 # ── Remove from Tailscale ─────────────────────────────────────────────────────
 if [[ -n "${TAILSCALE_API_TOKEN:-}" ]]; then
