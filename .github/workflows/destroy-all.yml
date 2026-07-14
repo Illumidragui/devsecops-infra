@@ -83,4 +83,4 @@ jobs:
 
       - name: Warn about dangling DNS
         run: |
-          echo "::warning::cloudflare_dns_record.apex / .www for shengjunye.me still point at the now-released EIP. They were intentionally kept out of this destroy — update or redeploy before relying on the domain again."
+          echo "::warning::hello/kuberflow DNS removed. apex/www are unaffected — they're a Cloudflare Pages custom domain, not managed by this repo."

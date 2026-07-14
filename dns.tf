@@ -1,30 +1,19 @@
-# DNS records for shengjunye.me, managed via Cloudflare (the zone's authoritative
-# nameservers — Porkbun is only the domain registrar). apex/www are proxied through
-# Cloudflare and — like the EIP — must never be destroyed alongside the EC2 instance.
-# hello/kuberflow are un-proxied lab/demo subdomains; destroy-all.sh/.yml intentionally
-# tears these two down alongside a full teardown (see CLAUDE.md invariants).
+# DNS records for the lab/demo subdomains on the k3s EC2 box, managed via Cloudflare
+# (the zone's authoritative nameservers — Porkbun is only the domain registrar).
+#
+# apex (shengjunye.me) and www are NOT managed here — they're a Cloudflare Pages
+# custom domain (see website/.github/workflows/deploy-cloudflare.yml, project
+# "shengsite"), owned entirely by Cloudflare Pages as CNAME records. Don't add them
+# as cloudflare_dns_record resources in this repo — Pages already manages that DNS,
+# and Terraform trying to create an A record at the same name will 400 with
+# "A CNAME record with that host already exists" (error 81054).
+#
+# hello/kuberflow are un-proxied and point at the EIP; destroy-all.sh/.yml
+# intentionally tears these two down alongside a full teardown (see CLAUDE.md).
 data "cloudflare_zone" "shengjunye" {
   filter = {
     name = "shengjunye.me"
   }
-}
-
-resource "cloudflare_dns_record" "apex" {
-  zone_id = data.cloudflare_zone.shengjunye.id
-  name    = "@"
-  type    = "A"
-  content = aws_eip.k3s.public_ip
-  ttl     = 1
-  proxied = true
-}
-
-resource "cloudflare_dns_record" "www" {
-  zone_id = data.cloudflare_zone.shengjunye.id
-  name    = "www"
-  type    = "A"
-  content = aws_eip.k3s.public_ip
-  ttl     = 1
-  proxied = true
 }
 
 resource "cloudflare_dns_record" "hello" {

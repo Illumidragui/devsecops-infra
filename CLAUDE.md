@@ -29,7 +29,7 @@ The root module is split by concern, mirroring the convention already used insid
 | `module.ec2` | `tf-modules/aws-ec2/` | EC2 t3.medium, SG, key pair, user_data (k3s + Tailscale) |
 | `aws_eip.k3s` | `eip.tf` | Elastic IP — never destroy this resource |
 | `aws_eip_association.k3s` | `eip.tf` | Binds EIP to EC2 on each deploy, torn down on destroy |
-| `cloudflare_dns_record.*` | `dns.tf` | A records (apex, `www`, `hello`, `kuberflow`) for `shengjunye.me`, pointing at `aws_eip.k3s` — apex/www never destroy, hello/kuberflow destroyed by `destroy-all` only |
+| `cloudflare_dns_record.*` | `dns.tf` | A records for `hello`/`kuberflow.shengjunye.me` only, pointing at `aws_eip.k3s` — destroyed by `destroy-all` only. Does **not** include apex/`www` (Cloudflare Pages custom domain, owned by the `website` repo) |
 
 ## Variables (required at deploy time)
 
@@ -70,7 +70,8 @@ bash scripts/destroy-all.sh
 - **deploy.yml** — manual `workflow_dispatch`: runs Phase 1 only (VPC + EC2 + EIP + DNS)
 - **destroy.yml** — manual `workflow_dispatch`: destroys EC2, preserves VPC + EIP + DNS
 - **destroy-all.yml** — manual `workflow_dispatch`: destroys EC2 + VPC + EIP allocation, plus the
-  `hello`/`kuberflow` DNS records; `apex`/`www` are preserved (they will dangle until next deploy)
+  `hello`/`kuberflow` DNS records (recreated on next deploy). `apex`/`www` are untouched — not managed
+  by this repo at all (Cloudflare Pages custom domain)
 
 ## Validation commands
 
@@ -84,16 +85,14 @@ tflint --recursive
 ## Key invariants — do not break these
 
 - **`aws_eip.k3s` must never be destroyed by `destroy.sh`/`destroy.yml`** — it is the target of the
-  DNS records for `shengjunye.me`. `destroy-all.sh`/`destroy-all.yml` is the sole intentional
-  exception: it releases the EIP (and VPC) for a full teardown, leaving `apex`/`www` DNS dangling
-  until redeploy.
-- **`cloudflare_dns_record.apex` / `.www` must never be destroyed by any workflow** — same reasoning as
-  the EIP: they're the main domain and must always resolve, so they belong outside
-  `destroy.sh`/`destroy.yml`/`destroy-all.sh`/`destroy-all.yml`.
-- **`cloudflare_dns_record.hello` / `.kuberflow` are the one exception** — `destroy-all.sh`/
-  `destroy-all.yml` intentionally destroys these two alongside the EIP/VPC, since they're lab/demo
-  subdomains with no reason to dangle while infra is torn down for cost savings. They're recreated
-  on the next deploy along with everything else.
+  `hello`/`kuberflow` DNS records. `destroy-all.sh`/`destroy-all.yml` is the sole intentional
+  exception: it releases the EIP (and VPC) for a full teardown, and removes those two DNS records
+  along with it (they're recreated on the next deploy).
+- **This repo does not manage `shengjunye.me` / `www` DNS at all** — that's a Cloudflare Pages custom
+  domain (CNAME, owned by `website/.github/workflows/deploy-cloudflare.yml`, project `shengsite`).
+  Do not add `cloudflare_dns_record.apex`/`.www` resources here: Cloudflare rejects an `A` record at
+  a hostname that already has a CNAME (error 81054), and this would conflict with Pages' own DNS
+  management of the live production site.
 - **Cloudflare, not Porkbun, is authoritative for `shengjunye.me` DNS** — Porkbun remains only the
   domain registrar (NS delegation points at Cloudflare). Don't reintroduce a `porkbun` provider here.
 - **No static AWS credentials** — OIDC only in CI; `aws configure` / SSO locally

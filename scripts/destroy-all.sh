@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # destroy-all.sh — Destroy EC2 + VPC + EIP allocation.
-# apex/www DNS records for shengjunye.me are kept (they will point at the
-# released EIP until you redeploy). hello/kuberflow are removed here since
-# they're lab/demo subdomains with no reason to dangle while infra is down.
+# hello/kuberflow DNS records are removed here since they're lab/demo subdomains
+# with no reason to dangle while infra is down. apex/www are untouched — they're
+# a Cloudflare Pages custom domain, not managed by this repo at all.
 #
 # Prerequisites:
 #   aws CLI configured
@@ -21,7 +21,7 @@ TS_HOSTNAME="${TS_HOSTNAME:-lab-kubernetes}"
 
 # ── Safety prompt ─────────────────────────────────────────────────────────────
 echo -e "${RED}WARNING${NC}: This will destroy the EC2 instance, VPC, and the EIP allocation."
-echo "apex/www DNS will keep pointing at the released IP until you redeploy. hello/kuberflow DNS records will be removed."
+echo "hello/kuberflow DNS records will be removed. apex/www are unaffected (Cloudflare Pages, not this repo)."
 read -r -p "Type 'destroy-all' to confirm: " CONFIRM
 [[ "${CONFIRM}" == "destroy-all" ]] || { echo "Aborted."; exit 0; }
 
@@ -76,5 +76,5 @@ terraform destroy -auto-approve -input=false \
   -target=cloudflare_dns_record.hello \
   -target=cloudflare_dns_record.kuberflow
 
-warn "cloudflare_dns_record.apex / .www for shengjunye.me still point at the now-released EIP."
-warn "Update or redeploy before relying on the domain again."
+warn "hello/kuberflow DNS removed. apex/www are unaffected — they're a Cloudflare Pages"
+warn "custom domain, not managed by this repo."
