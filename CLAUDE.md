@@ -82,6 +82,23 @@ terraform validate
 tflint --recursive
 ```
 
+## Troubleshooting
+
+- **`hello`/`kuberflow` intermittently resolve to the wrong place, or a domain you don't recognize**:
+  Cloudflare allows multiple `A` records at the same hostname and round-robins between them — it does
+  **not** warn you or replace an existing record when Terraform creates a new one at the same name.
+  If a record was ever added manually (outside Terraform) before being adopted here, you can end up
+  with a stale manual record *and* the Terraform-managed one both live at once. Check with
+  `dig <name>.shengjunye.me +noall +answer` — if it lists more than one `A` record, delete the
+  stale/non-Terraform one directly via the Cloudflare dashboard or API (list records with
+  `GET /zones/<zone_id>/dns_records?name=<name>.shengjunye.me`, confirm the ID against the one
+  Terraform created before deleting the other).
+- **`hello`/`kuberflow` DNS resolves fine but connection is refused on 80/443**: expected right after a
+  *fresh* EC2 instance comes up (e.g. after `destroy-all` + redeploy) — `deploy.sh`/`deploy.yml` only
+  provision VPC/EC2/EIP/DNS. Nothing listens on 80/443 until ArgoCD is bootstrapped
+  (`scripts/bootstrap-argocd.sh`) and syncs `ingress-nginx` + the workload charts from
+  `argocd-app-of-apps`. Not a bug — just means the next step hasn't run yet.
+
 ## Key invariants — do not break these
 
 - **`aws_eip.k3s` must never be destroyed by `destroy.sh`/`destroy.yml`** — it is the target of the
