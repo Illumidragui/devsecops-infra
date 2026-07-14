@@ -39,7 +39,10 @@ Access to the cluster (SSH, kubectl) is only possible through Tailscale. The sec
 ## Repository structure
 
 ```
-├── main.tf                        # Root module — wires VPC, EC2, EIP, ArgoCD
+├── versions.tf                    # required_providers + provider blocks (aws, porkbun)
+├── main.tf                        # Root module — locals + module.vpc / module.ec2 calls
+├── eip.tf                         # Elastic IP + association (kept outside module.ec2)
+├── dns.tf                         # Porkbun DNS records for shengjunye.me
 ├── variables.tf                   # Input variables
 ├── outputs.tf                     # Public IP, Tailscale hostname
 ├── backend.tf                     # S3 remote state
@@ -47,8 +50,8 @@ Access to the cluster (SSH, kubectl) is only possible through Tailscale. The sec
 │   ├── aws-vpc/                   # VPC, subnets, IGW, NAT Gateway, route tables
 │   └── aws-ec2/                   # EC2 instance, security group, SSH key pair
 └── .github/workflows/
-    ├── deploy.yml                 # Terraform apply: VPC + EC2 + EIP
-    └── destroy.yml                # Destroy EC2 + EIP association, EIP allocation preserved
+    ├── deploy.yml                 # Terraform apply: VPC + EC2 + EIP + DNS
+    └── destroy.yml                # Destroy EC2 + EIP association, EIP + DNS preserved
 ```
 
 ## GitHub secrets and variables
@@ -63,6 +66,8 @@ Access to the cluster (SSH, kubectl) is only possible through Tailscale. The sec
 | `TAILSCALE_OAUTH_CLIENTID` | OAuth client ID for the Tailscale GitHub Action and in-cluster operator |
 | `TAILSCALE_OAUTH_SECRET` | OAuth client secret (matching above) |
 | `TAILSCALE_API_TOKEN` | API access token (`tskey-api-...`) used to remove the device on destroy |
+| `PORKBUN_API_KEY` | Porkbun API key (porkbun.com/account/api) |
+| `PORKBUN_SECRET_API_KEY` | Porkbun secret API key |
 
 ### Variables (`vars.*`)
 
@@ -87,6 +92,8 @@ gh secret set TAILSCALE_AUTHKEY    --repo Illumidragui/devsecops-infra
 gh secret set TAILSCALE_OAUTH_CLIENTID --repo Illumidragui/devsecops-infra
 gh secret set TAILSCALE_OAUTH_SECRET   --repo Illumidragui/devsecops-infra
 gh secret set TAILSCALE_API_TOKEN  --repo Illumidragui/devsecops-infra
+gh secret set PORKBUN_API_KEY      --repo Illumidragui/devsecops-infra
+gh secret set PORKBUN_SECRET_API_KEY --repo Illumidragui/devsecops-infra
 gh variable set AWS_ROLE_ARN       --repo Illumidragui/devsecops-infra
 ```
 
@@ -119,12 +126,13 @@ Trigger the **Deploy Infrastructure** workflow from GitHub Actions (`workflow_di
 
 **What happens:**
 1. Runner joins the Tailnet and waits for the `lab-kubernetes` hostname slot to be free (handles rapid destroy → redeploy cycles)
-2. VPC, EC2, and Elastic IP are created via `terraform apply -target=module.vpc,module.ec2,aws_eip.k3s,aws_eip_association.k3s`. The EC2 user data installs Tailscale and k3s automatically.
+2. VPC, EC2, Elastic IP, and DNS records are created via `terraform apply -target=module.vpc,module.ec2,aws_eip.k3s,aws_eip_association.k3s,porkbun_dns_record.apex,porkbun_dns_record.www,porkbun_dns_record.hello`. The EC2 user data installs Tailscale and k3s automatically.
 3. Runner polls until k3s is ready, then copies the kubeconfig over SSH.
 
 ArgoCD is **not** deployed by this workflow — bootstrap it separately with `scripts/bootstrap-argocd.sh` once the cluster is ready.
 
-The Elastic IP is created outside the EC2 module so it survives destroy/redeploy cycles — your DNS record never changes.
+The Elastic IP is created outside the EC2 module so it survives destroy/redeploy cycles, and the DNS
+records (`shengjunye.me`, `www`, `hello`) always point at it — your DNS never needs to change.
 
 ## Destroy
 
@@ -132,7 +140,7 @@ Trigger the **Destroy Infrastructure** workflow and type `destroy` to confirm.
 
 **What happens:**
 1. Removes the EC2 from Tailscale via the API (instant — no waiting for ephemeral cleanup)
-2. Destroys the EC2 and EIP association via `terraform destroy -target=aws_eip_association.k3s,module.ec2` — **the Elastic IP allocation is preserved**
+2. Destroys the EC2 and EIP association via `terraform destroy -target=aws_eip_association.k3s,module.ec2` — **the Elastic IP allocation and DNS records are preserved**
 
 ArgoCD isn't managed by Terraform, so there's nothing to tear down here — it simply goes away with the EC2
 instance and gets rebootstrapped via `scripts/bootstrap-argocd.sh` on the next deploy.
@@ -144,8 +152,10 @@ instance and gets rebootstrapped via `scripts/bootstrap-argocd.sh` on the next d
 cp terraform.tfvars.example terraform.tfvars   # or create terraform.tfvars manually
 
 # Required variables (no defaults):
-# ssh_public_key    = "ssh-ed25519 AAAA..."
-# tailscale_authkey = "tskey-auth-..."
+# ssh_public_key         = "ssh-ed25519 AAAA..."
+# tailscale_authkey      = "tskey-auth-..."
+# porkbun_api_key        = "pk1_..."
+# porkbun_secret_api_key = "sk1_..."
 
 terraform init
 terraform plan
