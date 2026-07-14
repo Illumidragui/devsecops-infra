@@ -1,17 +1,17 @@
-name: Destroy Infrastructure
+name: Destroy Infrastructure (full teardown)
 
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type "destroy" to confirm'
+        description: 'Type "destroy-all" to confirm'
         required: true
 
 jobs:
-  destroy:
-    name: Destroy EC2 (EIP + VPC kept)
+  destroy-all:
+    name: Destroy EC2 + VPC + EIP (apex/www DNS kept, hello/kuberflow removed)
     runs-on: ubuntu-latest
-    if: github.event.inputs.confirm == 'destroy'
+    if: github.event.inputs.confirm == 'destroy-all'
     timeout-minutes: 15
     permissions:
       id-token: write
@@ -22,9 +22,9 @@ jobs:
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
       TF_VAR_tailscale_authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-      # Unused by this destroy (cloudflare_dns_record.* is never targeted) but the
-      # provider block in versions.tf requires a value or terraform prompts and hangs.
-      TF_VAR_cloudflare_api_token: "unused"
+      # cloudflare_dns_record.hello/.kuberflow ARE targeted below, so this needs
+      # to be a real token via repo secrets — CLOUDFLARE_API_TOKEN must be set.
+      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -71,13 +71,16 @@ jobs:
             "https://api.tailscale.com/api/v2/device/${DEVICE_ID}"
           echo "Removed lab-kubernetes from Tailscale"
 
-      - name: Destroy EIP association + EC2
+      - name: Destroy EC2 + VPC + EIP + hello/kuberflow DNS
         run: |
           terraform destroy -auto-approve \
             -target=aws_eip_association.k3s \
-            -target=module.ec2
+            -target=module.ec2 \
+            -target=aws_eip.k3s \
+            -target=module.vpc \
+            -target=cloudflare_dns_record.hello \
+            -target=cloudflare_dns_record.kuberflow
 
-      - name: Confirm EIP is preserved
+      - name: Warn about dangling DNS
         run: |
-          echo "EIP allocation preserved:"
-          terraform output public_ip
+          echo "::warning::cloudflare_dns_record.apex / .www for shengjunye.me still point at the now-released EIP. They were intentionally kept out of this destroy — update or redeploy before relying on the domain again."

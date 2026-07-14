@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# destroy.sh — Destroy EC2 + EIP association. VPC and EIP allocation are kept.
-# EIP is preserved so the DNS record (shengjunye.me → EIP) stays stable.
+# destroy-all.sh — Destroy EC2 + VPC + EIP allocation.
+# apex/www DNS records for shengjunye.me are kept (they will point at the
+# released EIP until you redeploy). hello/kuberflow are removed here since
+# they're lab/demo subdomains with no reason to dangle while infra is down.
 #
 # Prerequisites:
 #   aws CLI configured
@@ -9,19 +11,19 @@
 set -euo pipefail
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
-info()  { echo -e "${GREEN}[destroy]${NC} $*"; }
-warn()  { echo -e "${YELLOW}[destroy]${NC} $*"; }
-error() { echo -e "${RED}[destroy]${NC} $*" >&2; exit 1; }
+info()  { echo -e "${GREEN}[destroy-all]${NC} $*"; }
+warn()  { echo -e "${YELLOW}[destroy-all]${NC} $*"; }
+error() { echo -e "${RED}[destroy-all]${NC} $*" >&2; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INFRA_DIR="$(dirname "$SCRIPT_DIR")"
 TS_HOSTNAME="${TS_HOSTNAME:-lab-kubernetes}"
 
 # ── Safety prompt ─────────────────────────────────────────────────────────────
-echo -e "${RED}WARNING${NC}: This will destroy the EC2 instance and all running workloads."
-echo "The EIP allocation and VPC will be preserved."
-read -r -p "Type 'destroy' to confirm: " CONFIRM
-[[ "${CONFIRM}" == "destroy" ]] || { echo "Aborted."; exit 0; }
+echo -e "${RED}WARNING${NC}: This will destroy the EC2 instance, VPC, and the EIP allocation."
+echo "apex/www DNS will keep pointing at the released IP until you redeploy. hello/kuberflow DNS records will be removed."
+read -r -p "Type 'destroy-all' to confirm: " CONFIRM
+[[ "${CONFIRM}" == "destroy-all" ]] || { echo "Aborted."; exit 0; }
 
 # ── Pre-flight ────────────────────────────────────────────────────────────────
 command -v terraform >/dev/null || error "terraform not found"
@@ -32,8 +34,11 @@ aws sts get-caller-identity --query Arn --output text >/dev/null 2>&1 \
 [[ -n "${TF_VAR_ssh_public_key:-}" ]]    || error "TF_VAR_ssh_public_key is not set"
 [[ -n "${TF_VAR_tailscale_authkey:-}" ]] || error "TF_VAR_tailscale_authkey is not set"
 
-# Not used here (cloudflare_dns_record.* is never targeted) but the provider
-# block in versions.tf requires a value or terraform prompts interactively.
+# Falls back to a placeholder so terraform never hangs on an interactive prompt
+# (the provider block always needs *a* value) — but unlike destroy.sh, this
+# script targets cloudflare_dns_record.hello/.kuberflow for real, so an unset
+# TF_VAR_cloudflare_api_token will fail loudly at the destroy step below
+# instead of silently skipping those records.
 export TF_VAR_cloudflare_api_token="${TF_VAR_cloudflare_api_token:-unused}" # NOSONAR: TF_VAR_ prefix must exact-case-match the Terraform variable name
 
 # ── Remove from Tailscale ─────────────────────────────────────────────────────
@@ -62,11 +67,14 @@ cd "$INFRA_DIR"
 info "Initialising Terraform..."
 terraform init -input=false
 
-info "Destroying EIP association + EC2..."
+info "Destroying EIP association + EC2 + EIP + VPC + hello/kuberflow DNS..."
 terraform destroy -auto-approve -input=false \
   -target=aws_eip_association.k3s \
-  -target=module.ec2
+  -target=module.ec2 \
+  -target=aws_eip.k3s \
+  -target=module.vpc \
+  -target=cloudflare_dns_record.hello \
+  -target=cloudflare_dns_record.kuberflow
 
-EIP=$(terraform output -raw public_ip 2>/dev/null || echo "(could not read)")
-info "EC2 destroyed. EIP allocation preserved: ${EIP}"
-info "DNS record for shengjunye.me is still valid."
+warn "cloudflare_dns_record.apex / .www for shengjunye.me still point at the now-released EIP."
+warn "Update or redeploy before relying on the domain again."

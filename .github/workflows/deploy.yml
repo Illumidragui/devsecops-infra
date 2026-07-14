@@ -22,30 +22,31 @@ jobs:
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
       TF_VAR_tailscale_authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-      TF_VAR_porkbun_api_key: ${{ secrets.PORKBUN_API_KEY }}
-      TF_VAR_porkbun_secret_api_key: ${{ secrets.PORKBUN_SECRET_API_KEY }}
+      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: "~1.9"
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Set up SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
+          echo "${SSH_PRIVATE_KEY}" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
       # Join Tailnet before Phase 1 so we can verify the hostname slot is free
       # before the new EC2 boots and tries to register as lab-kubernetes.
-      - uses: tailscale/github-action@v2
+      - uses: tailscale/github-action@4e4c49acaa9818630ce0bd7a564372c17e33fb4d # v2
         with:
           oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
           oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
@@ -79,10 +80,10 @@ jobs:
             -target=module.ec2 \
             -target=aws_eip.k3s \
             -target=aws_eip_association.k3s \
-            -target=porkbun_dns_record.apex \
-            -target=porkbun_dns_record.www \
-            -target=porkbun_dns_record.hello \
-            -target=porkbun_dns_record.kuberflow
+            -target=cloudflare_dns_record.apex \
+            -target=cloudflare_dns_record.www \
+            -target=cloudflare_dns_record.hello \
+            -target=cloudflare_dns_record.kuberflow
 
       - name: Wait for k3s, then copy kubeconfig
         run: |
