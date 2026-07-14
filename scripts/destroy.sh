@@ -32,6 +32,11 @@ aws sts get-caller-identity --query Arn --output text >/dev/null 2>&1 \
 [[ -n "${TF_VAR_ssh_public_key:-}" ]]    || error "TF_VAR_ssh_public_key is not set"
 [[ -n "${TF_VAR_tailscale_authkey:-}" ]] || error "TF_VAR_tailscale_authkey is not set"
 
+# Not used here (porkbun_dns_record.* is never targeted) but the provider
+# block in versions.tf requires a value or terraform prompts interactively.
+export TF_VAR_porkbun_api_key="${TF_VAR_porkbun_api_key:-unused}"
+export TF_VAR_porkbun_secret_api_key="${TF_VAR_porkbun_secret_api_key:-unused}"
+
 # ── Remove from Tailscale ─────────────────────────────────────────────────────
 if [[ -n "${TAILSCALE_API_TOKEN:-}" ]]; then
   info "Removing ${TS_HOSTNAME} from Tailscale..."
