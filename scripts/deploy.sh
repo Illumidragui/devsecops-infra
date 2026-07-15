@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
-# deploy.sh — Provision VPC + EC2 + EIP and wait for k3s.
-# After this completes, run bootstrap-argocd.sh to install ArgoCD.
+# deploy.sh — Provision VPC + EC2 + EIP, wait for k3s, then auto-bootstrap ArgoCD.
 #
 # Prerequisites:
 #   aws CLI configured (aws configure / SSO / env vars)
 #   terraform >= 1.0
 #   tailscale CLI (optional — needed if connecting via Tailnet)
 #   ssh + scp
+#   kubectl, helm >= 3.0 — required for the bootstrap-argocd.sh hand-off at the end
 #
 # Required env vars (or set as TF_VAR_* in your shell):
 #   TF_VAR_ssh_public_key         — contents of your SSH public key
 #   TF_VAR_tailscale_authkey      — Tailscale pre-auth key for the EC2 node
 #   TF_VAR_cloudflare_api_token   — Cloudflare API token (dash.cloudflare.com/profile/api-tokens)
+#   ARGOCD_ADMIN_PASSWORD         — plaintext ArgoCD admin password (passed through to bootstrap-argocd.sh)
+#
+# Optional (passed through to bootstrap-argocd.sh):
+#   ARGOCD_GITHUB_REPO, TAILSCALE_OAUTH_CLIENTID, TAILSCALE_OAUTH_SECRET
+#
+# Set SKIP_ARGOCD_BOOTSTRAP=true to stop after infra + kubeconfig, as before.
 set -euo pipefail
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -35,6 +41,13 @@ aws sts get-caller-identity --query Arn --output text >/dev/null 2>&1 \
 [[ -n "${TF_VAR_ssh_public_key:-}" ]]       || error "TF_VAR_ssh_public_key is not set"
 [[ -n "${TF_VAR_tailscale_authkey:-}" ]]    || error "TF_VAR_tailscale_authkey is not set"
 [[ -n "${TF_VAR_cloudflare_api_token:-}" ]] || error "TF_VAR_cloudflare_api_token is not set"
+
+SKIP_ARGOCD_BOOTSTRAP="${SKIP_ARGOCD_BOOTSTRAP:-false}"
+if [[ "${SKIP_ARGOCD_BOOTSTRAP}" != "true" ]]; then
+  command -v kubectl >/dev/null || error "kubectl not found (required for the ArgoCD bootstrap hand-off; set SKIP_ARGOCD_BOOTSTRAP=true to skip it)"
+  command -v helm    >/dev/null || error "helm not found (required for the ArgoCD bootstrap hand-off; set SKIP_ARGOCD_BOOTSTRAP=true to skip it)"
+  [[ -n "${ARGOCD_ADMIN_PASSWORD:-}" ]] || error "ARGOCD_ADMIN_PASSWORD is not set (required for the ArgoCD bootstrap hand-off; set SKIP_ARGOCD_BOOTSTRAP=true to skip it)"
+fi
 
 USE_TAILSCALE=false
 if command -v tailscale >/dev/null 2>&1; then
@@ -95,4 +108,10 @@ sed -i "s/127.0.0.1/${NODE_IP}/g" "$KUBECONFIG_PATH"
 chmod 600 "$KUBECONFIG_PATH"
 
 info "Kubeconfig written to ${KUBECONFIG_PATH}"
-info "Done. Next step: run scripts/bootstrap-argocd.sh"
+
+if [[ "${SKIP_ARGOCD_BOOTSTRAP}" == "true" ]]; then
+  info "SKIP_ARGOCD_BOOTSTRAP=true — done. Next step: run scripts/bootstrap-argocd.sh"
+else
+  info "Handing off to bootstrap-argocd.sh..."
+  KUBECONFIG_PATH="${KUBECONFIG_PATH}" "${SCRIPT_DIR}/bootstrap-argocd.sh"
+fi
