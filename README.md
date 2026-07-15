@@ -124,13 +124,12 @@ Trigger the **Deploy Infrastructure** workflow from GitHub Actions (`workflow_di
 
 **What happens:**
 1. Runner joins the Tailnet and waits for the `lab-kubernetes` hostname slot to be free (handles rapid destroy → redeploy cycles)
-2. VPC, EC2, Elastic IP, and the `hello`/`kuberflow` DNS records are created via `terraform apply -target=module.vpc,module.ec2,aws_eip.k3s,aws_eip_association.k3s,cloudflare_dns_record.hello,cloudflare_dns_record.kuberflow`. The EC2 user data installs Tailscale and k3s automatically. (`shengjunye.me`/`www` are a Cloudflare Pages custom domain, deployed separately by the `website` repo — not managed here.)
+2. VPC, EC2, Elastic IP, and the `kuberflow` DNS record are created via `terraform apply -target=module.vpc,module.ec2,aws_eip.k3s,aws_eip_association.k3s,cloudflare_dns_record.kuberflow`. The EC2 user data installs Tailscale and k3s automatically. (`shengjunye.me`/`www` are a Cloudflare Pages custom domain, deployed separately by the `website` repo — not managed here.)
 3. Runner polls until k3s is ready, then copies the kubeconfig over SSH.
-
-ArgoCD is **not** deployed by this workflow — bootstrap it separately with `scripts/bootstrap-argocd.sh` once the cluster is ready.
+4. Runner auto-bootstraps ArgoCD + App of Apps (`scripts/bootstrap-argocd.sh`) in the same run — no manual follow-up step needed. Set `SKIP_ARGOCD_BOOTSTRAP=true` (local `deploy.sh` only) to stop after infra + kubeconfig instead.
 
 The Elastic IP is created outside the EC2 module so it survives destroy/redeploy cycles, and the
-`hello`/`kuberflow` DNS records always point at it — that DNS never needs to change.
+`kuberflow` DNS record always points at it — that DNS never needs to change.
 
 ## Destroy
 

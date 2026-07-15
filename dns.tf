@@ -8,21 +8,12 @@
 # and Terraform trying to create an A record at the same name will 400 with
 # "A CNAME record with that host already exists" (error 81054).
 #
-# hello/kuberflow are un-proxied and point at the EIP; destroy-all.sh/.yml
-# intentionally tears these two down alongside a full teardown (see CLAUDE.md).
+# kuberflow is un-proxied and points at the EIP; destroy-all.sh/.yml
+# intentionally tears it down alongside a full teardown (see CLAUDE.md).
 data "cloudflare_zone" "shengjunye" {
   filter = {
     name = "shengjunye.me"
   }
-}
-
-resource "cloudflare_dns_record" "hello" {
-  zone_id = data.cloudflare_zone.shengjunye.id
-  name    = "hello"
-  type    = "A"
-  content = aws_eip.k3s.public_ip
-  ttl     = 600
-  proxied = false
 }
 
 resource "cloudflare_dns_record" "kuberflow" {

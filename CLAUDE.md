@@ -29,7 +29,7 @@ The root module is split by concern, mirroring the convention already used insid
 | `module.ec2` | `tf-modules/aws-ec2/` | EC2 t3.medium, SG, key pair, user_data (k3s + Tailscale) |
 | `aws_eip.k3s` | `eip.tf` | Elastic IP — never destroy this resource |
 | `aws_eip_association.k3s` | `eip.tf` | Binds EIP to EC2 on each deploy, torn down on destroy |
-| `cloudflare_dns_record.*` | `dns.tf` | A records for `hello`/`kuberflow.shengjunye.me` only, pointing at `aws_eip.k3s` — destroyed by `destroy-all` only. Does **not** include apex/`www` (Cloudflare Pages custom domain, owned by the `website` repo) |
+| `cloudflare_dns_record.kuberflow` | `dns.tf` | A record for `kuberflow.shengjunye.me` only, pointing at `aws_eip.k3s` — destroyed by `destroy-all` only. Does **not** include apex/`www` (Cloudflare Pages custom domain, owned by the `website` repo) |
 
 ## Variables (required at deploy time)
 
@@ -80,7 +80,7 @@ bash scripts/destroy-all.sh
   fully automated end-to-end, no manual follow-up step
 - **destroy.yml** — manual `workflow_dispatch`: destroys EC2, preserves VPC + EIP + DNS
 - **destroy-all.yml** — manual `workflow_dispatch`: destroys EC2 + VPC + EIP allocation, plus the
-  `hello`/`kuberflow` DNS records (recreated on next deploy). `apex`/`www` are untouched — not managed
+  `kuberflow` DNS record (recreated on next deploy). `apex`/`www` are untouched — not managed
   by this repo at all (Cloudflare Pages custom domain)
 
 ## Validation commands
@@ -94,16 +94,17 @@ tflint --recursive
 
 ## Troubleshooting
 
-- **`hello`/`kuberflow` intermittently resolve to the wrong place, or a domain you don't recognize**:
+- **`kuberflow` intermittently resolves to the wrong place, or a domain you don't recognize**:
   Cloudflare allows multiple `A` records at the same hostname and round-robins between them — it does
   **not** warn you or replace an existing record when Terraform creates a new one at the same name.
-  If a record was ever added manually (outside Terraform) before being adopted here, you can end up
-  with a stale manual record *and* the Terraform-managed one both live at once. Check with
-  `dig <name>.shengjunye.me +noall +answer` — if it lists more than one `A` record, delete the
+  If a record was ever added manually (outside Terraform), you can end up with a stale manual record
+  *and* the Terraform-managed one both live at once. Check with
+  `dig kuberflow.shengjunye.me +noall +answer` — if it lists more than one `A` record, delete the
   stale/non-Terraform one directly via the Cloudflare dashboard or API (list records with
-  `GET /zones/<zone_id>/dns_records?name=<name>.shengjunye.me`, confirm the ID against the one
-  Terraform created before deleting the other).
-- **`hello`/`kuberflow` DNS resolves fine but connection is refused on 80/443**: `deploy.sh`/`deploy.yml`
+  `GET /zones/<zone_id>/dns_records?name=kuberflow.shengjunye.me`, confirm the ID against the one
+  Terraform created before deleting the other). This is exactly what happened to the old `hello`
+  subdomain before it was retired — a manual record predating Terraform never got cleaned up.
+- **`kuberflow` DNS resolves fine but connection is refused on 80/443**: `deploy.sh`/`deploy.yml`
   auto-bootstrap ArgoCD once k3s is `Ready`, but ArgoCD's own sync of `ingress-nginx` + the workload
   charts from `argocd-app-of-apps` still takes a few minutes after that. If you ran with
   `SKIP_ARGOCD_BOOTSTRAP=true`, nothing listens on 80/443 until you run `scripts/bootstrap-argocd.sh`
@@ -112,9 +113,9 @@ tflint --recursive
 ## Key invariants — do not break these
 
 - **`aws_eip.k3s` must never be destroyed by `destroy.sh`/`destroy.yml`** — it is the target of the
-  `hello`/`kuberflow` DNS records. `destroy-all.sh`/`destroy-all.yml` is the sole intentional
-  exception: it releases the EIP (and VPC) for a full teardown, and removes those two DNS records
-  along with it (they're recreated on the next deploy).
+  `kuberflow` DNS record. `destroy-all.sh`/`destroy-all.yml` is the sole intentional
+  exception: it releases the EIP (and VPC) for a full teardown, and removes that DNS record
+  along with it (it's recreated on the next deploy).
 - **This repo does not manage `shengjunye.me` / `www` DNS at all** — that's a Cloudflare Pages custom
   domain (CNAME, owned by `website/.github/workflows/deploy-cloudflare.yml`, project `shengsite`).
   Do not add `cloudflare_dns_record.apex`/`.www` resources here: Cloudflare rejects an `A` record at
