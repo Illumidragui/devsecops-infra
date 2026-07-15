@@ -40,25 +40,33 @@ The root module is split by concern, mirroring the convention already used insid
 | `TF_VAR_tailscale_hostname` | env var or default | Default: `lab-kubernetes` |
 | `TF_VAR_instance_type` | env var or default | Default: `t3.medium` |
 | `TF_VAR_cloudflare_api_token` | env var | Cloudflare API token, scoped to Zone:Read + DNS:Edit on `shengjunye.me` |
+| `ARGOCD_ADMIN_PASSWORD` | env var / repo secret | Plaintext ArgoCD admin password, consumed by `bootstrap-argocd.sh` (auto-chained from `deploy.sh`/`deploy.yml`). Skip via `SKIP_ARGOCD_BOOTSTRAP=true` if you don't need it yet |
+| `TAILSCALE_OAUTH_CLIENTID` / `TAILSCALE_OAUTH_SECRET` | env var / repo secret | Optional — exposes the ArgoCD UI via `tailscale-operator` |
 
 ## Local workflow (FinOps — spin up on demand)
 
+`deploy.sh` provisions infra and then auto-chains into `bootstrap-argocd.sh` once k3s is
+`Ready` — one command takes you from nothing to a synced ArgoCD. Set
+`SKIP_ARGOCD_BOOTSTRAP=true` to stop after infra + kubeconfig (old two-step behavior).
+
 ```bash
-# 1. Provision infra + wait for k3s
+# 1. Provision infra, wait for k3s, and bootstrap ArgoCD — one shot
 export TF_VAR_ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)"
 export TF_VAR_tailscale_authkey="tskey-auth-..."
 export TF_VAR_cloudflare_api_token="..."
+export ARGOCD_ADMIN_PASSWORD="your-password"
 bash scripts/deploy.sh
 
-# 2. Bootstrap ArgoCD (once per fresh cluster)
-export ARGOCD_ADMIN_PASSWORD="your-password"
-bash scripts/bootstrap-argocd.sh
+# 1b. Infra only, bootstrap ArgoCD yourself later
+export SKIP_ARGOCD_BOOTSTRAP=true
+bash scripts/deploy.sh
+bash scripts/bootstrap-argocd.sh   # once per fresh cluster
 
-# 3. Destroy when done (EIP is preserved)
+# 2. Destroy when done (EIP is preserved)
 export TAILSCALE_API_TOKEN="tskey-api-..."
 bash scripts/destroy.sh
 
-# 3b. Full teardown instead (EC2 + VPC + EIP allocation released, DNS records kept)
+# 2b. Full teardown instead (EC2 + VPC + EIP allocation released, DNS records kept)
 export TAILSCALE_API_TOKEN="tskey-api-..."
 bash scripts/destroy-all.sh
 ```
@@ -67,7 +75,9 @@ bash scripts/destroy-all.sh
 
 - **ci-fast.yml** — push to `dev`: gitleaks + terraform lint
 - **ci-pr.yml** — PR to `main`: gitleaks + terraform lint + Checkov
-- **deploy.yml** — manual `workflow_dispatch`: runs Phase 1 only (VPC + EC2 + EIP + DNS)
+- **deploy.yml** — manual `workflow_dispatch`: provisions VPC + EC2 + EIP + DNS, waits for
+  k3s, then bootstraps ArgoCD + App of Apps in the same run (mirrors `deploy.sh` locally) —
+  fully automated end-to-end, no manual follow-up step
 - **destroy.yml** — manual `workflow_dispatch`: destroys EC2, preserves VPC + EIP + DNS
 - **destroy-all.yml** — manual `workflow_dispatch`: destroys EC2 + VPC + EIP allocation, plus the
   `hello`/`kuberflow` DNS records (recreated on next deploy). `apex`/`www` are untouched — not managed
@@ -81,6 +91,23 @@ terraform init -backend=false
 terraform validate
 tflint --recursive
 ```
+
+## Troubleshooting
+
+- **`hello`/`kuberflow` intermittently resolve to the wrong place, or a domain you don't recognize**:
+  Cloudflare allows multiple `A` records at the same hostname and round-robins between them — it does
+  **not** warn you or replace an existing record when Terraform creates a new one at the same name.
+  If a record was ever added manually (outside Terraform) before being adopted here, you can end up
+  with a stale manual record *and* the Terraform-managed one both live at once. Check with
+  `dig <name>.shengjunye.me +noall +answer` — if it lists more than one `A` record, delete the
+  stale/non-Terraform one directly via the Cloudflare dashboard or API (list records with
+  `GET /zones/<zone_id>/dns_records?name=<name>.shengjunye.me`, confirm the ID against the one
+  Terraform created before deleting the other).
+- **`hello`/`kuberflow` DNS resolves fine but connection is refused on 80/443**: `deploy.sh`/`deploy.yml`
+  auto-bootstrap ArgoCD once k3s is `Ready`, but ArgoCD's own sync of `ingress-nginx` + the workload
+  charts from `argocd-app-of-apps` still takes a few minutes after that. If you ran with
+  `SKIP_ARGOCD_BOOTSTRAP=true`, nothing listens on 80/443 until you run `scripts/bootstrap-argocd.sh`
+  yourself. Either way, not a bug — just means ingress/workloads haven't synced yet.
 
 ## Key invariants — do not break these
 
@@ -96,7 +123,9 @@ tflint --recursive
 - **Cloudflare, not Porkbun, is authoritative for `shengjunye.me` DNS** — Porkbun remains only the
   domain registrar (NS delegation points at Cloudflare). Don't reintroduce a `porkbun` provider here.
 - **No static AWS credentials** — OIDC only in CI; `aws configure` / SSO locally
-- **`module.helm-argocd` does not exist** — ArgoCD is bootstrapped via `scripts/bootstrap-argocd.sh`
+- **`module.helm-argocd` does not exist** — ArgoCD is bootstrapped via `scripts/bootstrap-argocd.sh`,
+  which is not Terraform; `deploy.sh`/`deploy.yml` auto-chain into it as a shell/CI step, not a
+  Terraform resource
 - **EC2 is in the public subnet** but port 6443 (k3s API) is restricted to VPC CIDR only
 - Tailscale is the only external access path to k3s; do not open 6443 to 0.0.0.0/0
 

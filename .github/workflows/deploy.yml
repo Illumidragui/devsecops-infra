@@ -23,6 +23,9 @@ jobs:
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
       TF_VAR_tailscale_authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
       TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      ARGOCD_ADMIN_PASSWORD: ${{ secrets.ARGOCD_ADMIN_PASSWORD }}
+      TAILSCALE_OAUTH_CLIENTID: ${{ secrets.TAILSCALE_OAUTH_CLIENTID }}
+      TAILSCALE_OAUTH_SECRET: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
 
     steps:
       - uses: actions/checkout@v4
@@ -112,7 +115,14 @@ jobs:
           scp $SSH_OPTS ec2-user@${TAILSCALE_IP}:/etc/rancher/k3s/k3s.yaml ~/.kube/devsecops-config
           sed -i "s/127.0.0.1/${TAILSCALE_IP}/g" ~/.kube/devsecops-config
           echo "Kubeconfig written to ~/.kube/devsecops-config"
-          echo "Run scripts/bootstrap-argocd.sh locally to complete GitOps setup."
+
+      - name: Install ArgoCD bootstrap prerequisites
+        run: sudo apt-get update -qq && sudo apt-get install -y apache2-utils
+
+      - name: Bootstrap ArgoCD + App of Apps
+        env:
+          KUBECONFIG_PATH: /home/runner/.kube/devsecops-config
+        run: bash scripts/bootstrap-argocd.sh
 
       - name: Print public IP
         run: terraform output public_ip
