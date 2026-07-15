@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # destroy-all.sh — Destroy EC2 + VPC + EIP allocation.
-# hello/kuberflow DNS records are removed here since they're lab/demo subdomains
+# The kuberflow DNS record is removed here since it's a lab/demo subdomain
 # with no reason to dangle while infra is down. apex/www are untouched — they're
 # a Cloudflare Pages custom domain, not managed by this repo at all.
 #
@@ -21,7 +21,7 @@ TS_HOSTNAME="${TS_HOSTNAME:-lab-kubernetes}"
 
 # ── Safety prompt ─────────────────────────────────────────────────────────────
 echo -e "${RED}WARNING${NC}: This will destroy the EC2 instance, VPC, and the EIP allocation."
-echo "hello/kuberflow DNS records will be removed. apex/www are unaffected (Cloudflare Pages, not this repo)."
+echo "kuberflow DNS record will be removed. apex/www are unaffected (Cloudflare Pages, not this repo)."
 read -r -p "Type 'destroy-all' to confirm: " CONFIRM
 [[ "${CONFIRM}" == "destroy-all" ]] || { echo "Aborted."; exit 0; }
 
@@ -36,9 +36,9 @@ aws sts get-caller-identity --query Arn --output text >/dev/null 2>&1 \
 
 # Falls back to a placeholder so terraform never hangs on an interactive prompt
 # (the provider block always needs *a* value) — but unlike destroy.sh, this
-# script targets cloudflare_dns_record.hello/.kuberflow for real, so an unset
+# script targets cloudflare_dns_record.kuberflow for real, so an unset
 # TF_VAR_cloudflare_api_token will fail loudly at the destroy step below
-# instead of silently skipping those records.
+# instead of silently skipping that record.
 export TF_VAR_cloudflare_api_token="${TF_VAR_cloudflare_api_token:-unused}" # NOSONAR: TF_VAR_ prefix must exact-case-match the Terraform variable name
 
 # ── Remove from Tailscale ─────────────────────────────────────────────────────
@@ -67,14 +67,13 @@ cd "$INFRA_DIR"
 info "Initialising Terraform..."
 terraform init -input=false
 
-info "Destroying EIP association + EC2 + EIP + VPC + hello/kuberflow DNS..."
+info "Destroying EIP association + EC2 + EIP + VPC + kuberflow DNS..."
 terraform destroy -auto-approve -input=false \
   -target=aws_eip_association.k3s \
   -target=module.ec2 \
   -target=aws_eip.k3s \
   -target=module.vpc \
-  -target=cloudflare_dns_record.hello \
   -target=cloudflare_dns_record.kuberflow
 
-warn "hello/kuberflow DNS removed. apex/www are unaffected — they're a Cloudflare Pages"
+warn "kuberflow DNS removed. apex/www are unaffected — they're a Cloudflare Pages"
 warn "custom domain, not managed by this repo."

@@ -9,7 +9,7 @@ on:
 
 jobs:
   destroy-all:
-    name: Destroy EC2 + VPC + EIP (apex/www DNS kept, hello/kuberflow removed)
+    name: Destroy EC2 + VPC + EIP (apex/www DNS kept, kuberflow removed)
     runs-on: ubuntu-latest
     if: github.event.inputs.confirm == 'destroy-all'
     timeout-minutes: 15
@@ -22,7 +22,7 @@ jobs:
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
       TF_VAR_tailscale_authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-      # cloudflare_dns_record.hello/.kuberflow ARE targeted below, so this needs
+      # cloudflare_dns_record.kuberflow IS targeted below, so this needs
       # to be a real token via repo secrets — CLOUDFLARE_API_TOKEN must be set.
       TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
@@ -71,16 +71,15 @@ jobs:
             "https://api.tailscale.com/api/v2/device/${DEVICE_ID}"
           echo "Removed lab-kubernetes from Tailscale"
 
-      - name: Destroy EC2 + VPC + EIP + hello/kuberflow DNS
+      - name: Destroy EC2 + VPC + EIP + kuberflow DNS
         run: |
           terraform destroy -auto-approve \
             -target=aws_eip_association.k3s \
             -target=module.ec2 \
             -target=aws_eip.k3s \
             -target=module.vpc \
-            -target=cloudflare_dns_record.hello \
             -target=cloudflare_dns_record.kuberflow
 
       - name: Warn about dangling DNS
         run: |
-          echo "::warning::hello/kuberflow DNS removed. apex/www are unaffected — they're a Cloudflare Pages custom domain, not managed by this repo."
+          echo "::warning::kuberflow DNS removed. apex/www are unaffected — they're a Cloudflare Pages custom domain, not managed by this repo."

@@ -83,7 +83,6 @@ jobs:
             -target=module.ec2 \
             -target=aws_eip.k3s \
             -target=aws_eip_association.k3s \
-            -target=cloudflare_dns_record.hello \
             -target=cloudflare_dns_record.kuberflow
 
       - name: Wait for k3s, then copy kubeconfig
